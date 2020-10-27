@@ -1,12 +1,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h> // Eventueel met WiFi.h http request implementen, schilt een hoop flash geheugen
+#include <utils.h>
 
 #define MAXTELEGRAMLENGTH 1500 // Length of chars to read for decoding
-
-// Network credentials
-const char* ssid = "SSId";
-const char* password = "pass";
 
 // Backoffice URL endpoint
 const char* url = "http://192.168.178.101:8000/slimmemeter";
@@ -64,7 +61,7 @@ void setup() {
   P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1);  // Start HardwareSerial. RX, TX
 
   // Connecting to Wi-Fi
-  WiFi.begin(ssid, password);
+  WiFi.begin(SSID, PASS);
   Serial.print("Connecting to WiFi");
   while(WiFi.status() != WL_CONNECTED){
     Serial.print(".");

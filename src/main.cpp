@@ -53,13 +53,14 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting...");
 
-  WiFi.mode(WIFI_STA);
+  //WiFi.mode(WIFI_STA);
 
   // Configure P1Poort serial connection
   pinMode(dataReqPin, OUTPUT);
   digitalWrite(dataReqPin, LOW);
   P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1);  // Start HardwareSerial. RX, TX
 
+  
   // Connecting to Wi-Fi
   WiFi.begin(SSID, PASS);
   Serial.print("Connecting to WiFi");
@@ -68,6 +69,8 @@ void setup() {
     delay(500);
   }
   Serial.println("\nConnected to WiFi");
+  
+  
 
 }
 

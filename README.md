@@ -8,3 +8,11 @@ Firmware for ESP32 to read and parse data from Smart meter and send to backoffic
 * Shorten JSON parameters for backoffice communication
 * Add WiFi configure functionality to exchange the WiFi credentials trough App
 * Remove code made for debugging
+
+## Dependencies
+```
+#include <Arduino.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <utils.h>
+```

@@ -6,7 +6,7 @@
 #define MAXTELEGRAMLENGTH 1500 // Length of chars to read for decoding
 
 // Backoffice URL endpoint
-const char* url = "http://192.168.178.101:8000/slimmemeter";
+const char* url = "http://192.168.178.129:8000/slimmemeter";
 
 //Pin setup
 HardwareSerial P1Poort(1); // Use UART1
@@ -29,7 +29,7 @@ char timeGasMeasurement[12]; // Tijdstip waarop gas voor het laats is gemeten YY
 char timeRead[12]; // Tijdstip waarop meter voor het laats is uitgelezen YY:MM:DD:HH:MM:SS
 
 // Debug values:
-bool printAllData = true;
+bool printAllData = false;
 bool printDecodedData = true;
 
 // CRC
@@ -49,10 +49,13 @@ String convertToString(char[]);
 void makePostRequest();
 
 void setup() {
+  // TEMP LINE
+  //delay(10000);
+
   // Start terminal communication
   Serial.begin(115200);
-  Serial.println("Starting...");
-
+  //Serial.println("Starting...");
+  Serial.print(100);
   //WiFi.mode(WIFI_STA);
 
   // Configure P1Poort serial connection
@@ -60,18 +63,25 @@ void setup() {
   digitalWrite(dataReqPin, LOW);
   P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1);  // Start HardwareSerial. RX, TX
 
-  
+  // TEMP LINE
+  delay(100);
+
   // Connecting to Wi-Fi
-  WiFi.begin(SSID, PASS);
   Serial.print("Connecting to WiFi");
+
+  // TEMP LINE
+  Serial.print(200);
+
+  WiFi.begin(SSID, PASS);
   while(WiFi.status() != WL_CONNECTED){
-    Serial.print(".");
+    Serial.print(500);
     delay(500);
   }
+  // TEMP LINE 
+  Serial.print(300);
   Serial.println("\nConnected to WiFi");
-  
-  
-
+  // TEMP LINE
+  //delay(10000);
 }
 
 void loop() {
@@ -79,6 +89,10 @@ void loop() {
   memset(telegram, 0, sizeof(telegram)); // Empty telegram
   int maxRead = 0;
   getData(maxRead);
+
+  // TEMP LINE
+  delay(100);
+  // ENDTEMP
 
   makePostRequest();
 
@@ -88,7 +102,6 @@ void loop() {
 // Reads data and calls function procesData(int) to proces the data
 void getData(int maxRead){
   while(P1Poort.available()){ // Buffer leegmaken
-    yield();
     P1Poort.read();
   }
   digitalWrite(dataReqPin, HIGH); // Request data
@@ -100,7 +113,6 @@ void getData(int maxRead){
   bool crcFound = false;
 
   while(!crcFound && timeOutCounter<15000){ // Reads data untill one telegram is fully readed and copied, after not receiving data for 15 seconds the loop exits 
-    yield();
     if(P1Poort.available()){
       char c = P1Poort.read();
       char inChar = (char)c;
@@ -352,6 +364,7 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len) {
 
 void makePostRequest() {
   if(WiFi.status() == WL_CONNECTED){
+    Serial.println("Creating HTTP client");
     HTTPClient httpClient;
 
     String postData = String("{\"dsmrVersion\": ") +dsmrVersion +
@@ -366,11 +379,13 @@ void makePostRequest() {
     ", \"timeGasMeasurement\": " +convertToString(timeGasMeasurement) +
     ", \"timeRead\": " +convertToString(timeRead) +
     "}";
-    Serial.println(postData);
+    //Serial.println(postData);
 
+    Serial.println("Starting url connection");
     httpClient.begin(url);
     httpClient.addHeader("Content-Type", "application/json");
     
+    Serial.println("Creating POST req");
     int httpCode = httpClient.POST(postData);
 
     if(httpCode > 0){

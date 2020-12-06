@@ -1,0 +1,4 @@
+Added Component: Designator=R13(R1206)
+Add component (AddParameter): Name = "Value"; Value = "0"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=GND Pin=R13-1
+Added Pin To Net: NetName=ESPGND Pin=R13-2

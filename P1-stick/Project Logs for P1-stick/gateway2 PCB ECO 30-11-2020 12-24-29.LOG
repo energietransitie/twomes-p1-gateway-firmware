@@ -1,0 +1,75 @@
+Added Pin To Net: NetName=+3V3 Pin=MCU1-8
+Added Pin To Net: NetName=+3V3 Pin=R7-2
+Added Pin To Net: NetName=+3V3 Pin=R10-2
+Added Net: Name=+3V3
+Added Pin To Net: NetName=+5 Pin=C1-1
+Added Pin To Net: NetName=+5 Pin=C2-1
+Added Pin To Net: NetName=+5 Pin=C3-1
+Added Pin To Net: NetName=+5 Pin=C4-1
+Added Pin To Net: NetName=+5 Pin=MCU1-13
+Added Pin To Net: NetName=+5 Pin=R1-2
+Added Pin To Net: NetName=+5 Pin=R2-1
+Added Pin To Net: NetName=+5 Pin=R6-2
+Added Pin To Net: NetName=+5 Pin=R8-2
+Added Net: Name=+5
+Added Pin To Net: NetName=Button Pin=MCU1-5
+Added Pin To Net: NetName=Button Pin=R10-1
+Added Net: Name=Button
+Added Pin To Net: NetName=Data_req Pin=MCU1-3
+Added Pin To Net: NetName=Data_req Pin=R9-1
+Added Net: Name=Data_req
+Added Pin To Net: NetName=DTR_SM Pin=J1-A2
+Added Pin To Net: NetName=DTR_SM Pin=Q4-1
+Added Pin To Net: NetName=DTR_SM Pin=R6-1
+Added Net: Name=DTR_SM
+Added Pin To Net: NetName=ESPGND Pin=C1-2
+Added Pin To Net: NetName=ESPGND Pin=C2-2
+Added Pin To Net: NetName=ESPGND Pin=C3-2
+Added Pin To Net: NetName=ESPGND Pin=C4-2
+Added Pin To Net: NetName=ESPGND Pin=D2-1
+Added Pin To Net: NetName=ESPGND Pin=MCU1-14
+Added Pin To Net: NetName=ESPGND Pin=Q1-3
+Added Pin To Net: NetName=ESPGND Pin=Q3-3
+Added Net: Name=ESPGND
+Added Pin To Net: NetName=GND Pin=J1-A3
+Added Pin To Net: NetName=GND Pin=J1-A6
+Added Pin To Net: NetName=GND Pin=Q2-3
+Added Pin To Net: NetName=GND Pin=Q3-2
+Added Pin To Net: NetName=GND Pin=Q4-3
+Added Pin To Net: NetName=GND Pin=R3-1
+Added Pin To Net: NetName=GND Pin=R4-1
+Added Pin To Net: NetName=GND Pin=R5-1
+Added Net: Name=GND
+Added Pin To Net: NetName=LED Pin=MCU1-4
+Added Pin To Net: NetName=LED Pin=R11-2
+Added Net: Name=LED
+Added Pin To Net: NetName=NetD1_1 Pin=D1-K
+Added Pin To Net: NetName=NetD1_1 Pin=R1-1
+Added Net: Name=NetD1_1
+Added Pin To Net: NetName=NetD1_2 Pin=D1-A
+Added Pin To Net: NetName=NetD1_2 Pin=J1-A1
+Added Net: Name=NetD1_2
+Added Pin To Net: NetName=NetD2_2 Pin=D2-2
+Added Pin To Net: NetName=NetD2_2 Pin=R11-1
+Added Net: Name=NetD2_2
+Added Pin To Net: NetName=NetQ1_1 Pin=Q1-1
+Added Pin To Net: NetName=NetQ1_1 Pin=Q2-2
+Added Pin To Net: NetName=NetQ1_1 Pin=R3-2
+Added Pin To Net: NetName=NetQ1_1 Pin=R4-2
+Added Pin To Net: NetName=NetQ1_1 Pin=R5-2
+Added Net: Name=NetQ1_1
+Added Pin To Net: NetName=NetQ1_2 Pin=Q1-2
+Added Pin To Net: NetName=NetQ1_2 Pin=Q2-1
+Added Pin To Net: NetName=NetQ1_2 Pin=R2-2
+Added Net: Name=NetQ1_2
+Added Pin To Net: NetName=NetQ4_2 Pin=Q4-2
+Added Pin To Net: NetName=NetQ4_2 Pin=R9-2
+Added Net: Name=NetQ4_2
+Added Pin To Net: NetName=Rx_ESP Pin=MCU1-15
+Added Pin To Net: NetName=Rx_ESP Pin=Q3-4
+Added Pin To Net: NetName=Rx_ESP Pin=R7-1
+Added Net: Name=Rx_ESP
+Added Pin To Net: NetName=Tx_SM Pin=J1-A5
+Added Pin To Net: NetName=Tx_SM Pin=Q3-1
+Added Pin To Net: NetName=Tx_SM Pin=R8-1
+Added Net: Name=Tx_SM

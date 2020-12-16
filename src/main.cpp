@@ -5,13 +5,19 @@
 
 #define MAXTELEGRAMLENGTH 1500 // Length of chars to read for decoding
 
+// TEMP telnet server
+WiFiClient client;
+
 // Backoffice URL endpoint
 const char* url = "http://192.168.178.129:8000/slimmemeter";
 
 //Pin setup
-HardwareSerial P1Poort(1); // Use UART1
-const int dataReceivePin = 17; // Data receive pin
+HardwareSerial P1Poort(2); // Use UART2
+const int dataReceivePin = 16; // Data receive pin
 const int dataReqPin = 26; // Request pin on 26
+const int redLed = 18;
+const int greenLed = 23;  // Tijdelijke GPIO 5, moet GPIO 23 zijn!
+const int button = 19;
 
 char telegram[MAXTELEGRAMLENGTH]; // Variable for telegram data
 
@@ -29,7 +35,7 @@ char timeGasMeasurement[12]; // Tijdstip waarop gas voor het laats is gemeten YY
 char timeRead[12]; // Tijdstip waarop meter voor het laats is uitgelezen YY:MM:DD:HH:MM:SS
 
 // Debug values:
-bool printAllData = false;
+bool printAllData = true;
 bool printDecodedData = true;
 
 // CRC
@@ -47,64 +53,82 @@ bool crcCheck(int, int);
 unsigned int CRC16(unsigned int, unsigned char*, int);
 String convertToString(char[]); 
 void makePostRequest();
+void interruptButton();
 
 void setup() {
-  // TEMP LINE
-  //delay(10000);
-
   // Start terminal communication
   Serial.begin(115200);
-  //Serial.println("Starting...");
-  Serial.print(100);
-  //WiFi.mode(WIFI_STA);
+  Serial.println("Starting...");
+
+  // Pin setup
+  pinMode(dataReqPin, OUTPUT);
+  pinMode(redLed, OUTPUT);
+  pinMode(greenLed, OUTPUT);
+  pinMode(button, INPUT);
+  digitalWrite(dataReqPin, HIGH);
+  digitalWrite(redLed, HIGH);
+  digitalWrite(greenLed, HIGH);
+
+  // Attatch interrupt to button
+  attachInterrupt(button, interruptButton, FALLING);
 
   // Configure P1Poort serial connection
-  pinMode(dataReqPin, OUTPUT);
-  digitalWrite(dataReqPin, LOW);
   P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1);  // Start HardwareSerial. RX, TX
-
-  // TEMP LINE
-  delay(100);
 
   // Connecting to Wi-Fi
   Serial.print("Connecting to WiFi");
-
-  // TEMP LINE
-  Serial.print(200);
-
+  WiFi.mode(WIFI_STA);
+  Serial.println("WiFi in station mode");
+  delay(1000);
   WiFi.begin(SSID, PASS);
   while(WiFi.status() != WL_CONNECTED){
-    Serial.print(500);
+    Serial.print(".");
     delay(500);
   }
-  // TEMP LINE 
-  Serial.print(300);
+
   Serial.println("\nConnected to WiFi");
-  // TEMP LINE
-  //delay(10000);
+  
+  // TEMP setup TCP connection for debugging
+  if(client.connect("192.168.178.129", 9090)){
+    Serial.println("Connected to telnet server!");
+  } else{
+    Serial.println("Could not connect to telnet server");
+  }
+
+  String socketServerMessage = WiFi.macAddress() + " is connected!";
+  client.println(socketServerMessage);
 }
 
 void loop() {
+  
   Serial.println();
   memset(telegram, 0, sizeof(telegram)); // Empty telegram
   int maxRead = 0;
   getData(maxRead);
 
-  // TEMP LINE
-  delay(100);
-  // ENDTEMP
-
   makePostRequest();
 
   delay(10000);
+  
+ /*
+ digitalWrite(dataReqPin, LOW);
+ delay(5000);
+ digitalWrite(dataReqPin, HIGH);
+ delay(5000);
+ */
+}
+
+// This function gets called when button is pressed
+void interruptButton(){
+  
 }
 
 // Reads data and calls function procesData(int) to proces the data
 void getData(int maxRead){
-  while(P1Poort.available()){ // Buffer leegmaken
+  while(P1Poort.available()){ // Buffer leegmaken 
     P1Poort.read();
   }
-  digitalWrite(dataReqPin, HIGH); // Request data
+  digitalWrite(dataReqPin, LOW); // Request data
 
   int counter = 0;
   int timeOutCounter = 0;
@@ -143,7 +167,7 @@ void getData(int maxRead){
     }
   }
   maxRead++;
-  digitalWrite(dataReqPin, LOW); // Stop requesting data
+  digitalWrite(dataReqPin, HIGH); // Stop requesting data
   procesData(maxRead);
 }
 
@@ -176,10 +200,12 @@ bool procesData(int maxRead){
   } else{
     if(maxRead<10){
     Serial.println("Not all data found, reading data again");
+    client.println("Not all data found, reading data again");
     //Data was not read correctly, try reading again
     getData(maxRead);
     } else{
       Serial.println("Not all data found, maxRead has reached it's limit");
+      client.println("Not all data found, maxRead has reached it's limit");
       return false;
     }
   }
@@ -381,6 +407,7 @@ void makePostRequest() {
     "}";
     //Serial.println(postData);
 
+    client.println(postData);
     Serial.println("Starting url connection");
     httpClient.begin(url);
     httpClient.addHeader("Content-Type", "application/json");

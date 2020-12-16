@@ -19,7 +19,7 @@ Smart meter
 {
     "id": "FF:FF:FF:FF:FF",
     "dataSpec": {
-        "lastTime": "201023113050",
+        "lastTime": "201023113050", //=2020/10/23 @ 11:30am 50 sec local time
         "interval": 10,
         "total": 6
     },

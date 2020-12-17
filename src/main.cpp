@@ -5,8 +5,8 @@
 
 #define MAXTELEGRAMLENGTH 1500 // Length of chars to read for decoding
 
-// TEMP telnet server
-WiFiClient client;
+// TEMP TCP connection
+//WiFiClient client;
 
 // Backoffice URL endpoint
 const char* url = "http://192.168.178.129:8000/slimmemeter";
@@ -89,6 +89,7 @@ void setup() {
   Serial.println("\nConnected to WiFi");
   
   // TEMP setup TCP connection for debugging
+  /*
   if(client.connect("192.168.178.129", 9090)){
     Serial.println("Connected to telnet server!");
   } else{
@@ -96,7 +97,7 @@ void setup() {
   }
 
   String socketServerMessage = WiFi.macAddress() + " is connected!";
-  client.println(socketServerMessage);
+  client.println(socketServerMessage);*/
 }
 
 void loop() {
@@ -106,7 +107,7 @@ void loop() {
   int maxRead = 0;
   getData(maxRead);
 
-  makePostRequest();
+  //makePostRequest();
 
   delay(10000);
   
@@ -200,12 +201,12 @@ bool procesData(int maxRead){
   } else{
     if(maxRead<10){
     Serial.println("Not all data found, reading data again");
-    client.println("Not all data found, reading data again");
+    //client.println("Not all data found, reading data again");
     //Data was not read correctly, try reading again
     getData(maxRead);
     } else{
       Serial.println("Not all data found, maxRead has reached it's limit");
-      client.println("Not all data found, maxRead has reached it's limit");
+      //client.println("Not all data found, maxRead has reached it's limit");
       return false;
     }
   }
@@ -407,7 +408,7 @@ void makePostRequest() {
     "}";
     //Serial.println(postData);
 
-    client.println(postData);
+    //client.println(postData);
     Serial.println("Starting url connection");
     httpClient.begin(url);
     httpClient.addHeader("Content-Type", "application/json");

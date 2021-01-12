@@ -2,10 +2,10 @@
 #include <WiFi.h>
 #include <HTTPClient.h> // Eventueel met WiFi.h http request implementen, schilt een hoop flash geheugen
 #include <utils.h>
-#include <ArduinoJson.h>    //this is used for parsing json
+#include <ArduinoJson.h> //this is used for parsing json
 
-#define MAXTELEGRAMLENGTH 1500 // Length of chars to read for decoding
-#define MAXSENDMESSAGELENGTH 1500   //review this, maybe this could be dynamic allocated
+#define MAXTELEGRAMLENGTH 1500    // Length of chars to read for decoding
+#define MAXSENDMESSAGELENGTH 1500 //review this, maybe this could be dynamic allocated
 
 // TEMP TCP connection
 //WiFiClient client;
@@ -13,7 +13,7 @@
 // Backoffice URL endpoint
 
 //defines for selecting send_mode
-#define numberofUri 3
+#define numberOfModes 3
 #define smartMeter_send_mode 0
 #define roomTemp_send_mode 1
 #define boilerTemp_send_mode 2
@@ -22,7 +22,7 @@ struct serverCredentials
 {
   const char *serverAddress = defaultserverAddress;
   const uint16_t serverPort = defaultServerPort;
-  const char *serverURI[numberofUri] = {smartMeterUri, roomTempUri, boilerTempUri};
+  const char *serverURI[numberOfModes] = {smartMeterUri, roomTempUri, boilerTempUri};
 } serverCredentials1;
 
 //Pin setup
@@ -35,9 +35,9 @@ const int button = 19;
 
 char telegram[MAXTELEGRAMLENGTH]; // Variable for telegram data
 
-char sendMessage[MAXSENDMESSAGELENGTH];   //review this: this memory should be allocated in sender function
+char sendMessage[MAXSENDMESSAGELENGTH]; //review this: this memory should be allocated in sender function
 
-//defines for max amount of memory allocated for measurements 
+//defines for max amount of memory allocated for measurements
 #define maxMeasurements_dsmr 10
 #define maxMeasurements_roomTemp 10
 #define maxMeasurements_boiler 10
@@ -58,13 +58,13 @@ struct dsmrData
 };
 struct dsmrData dsmr_measurement[maxMeasurements_dsmr];
 
-struct roomTempData{  //add variables for receiving data from roomTemp monitor device
-
+struct roomTempData
+{ //add variables for receiving data from roomTemp monitor device
 };
 struct roomTempData roomTemp_measurement[maxMeasurements_roomTemp];
 
-struct boilerData{  //add variables for receiving data from boiler monitor device
-
+struct boilerData
+{ //add variables for receiving data from boiler monitor device
 };
 struct boilerData boiler_measurement[maxMeasurements_boiler];
 
@@ -80,7 +80,7 @@ void getData(int);
 void printData(int, int);
 int FindCharInArrayRev(char[], char, int, int);
 void printValue(int, int);
-bool checkValues(int, bool);
+bool checkValues(int, bool, byte);
 void decodeTelegram(int, int);
 bool procesData(int);
 bool crcCheck(int, int);
@@ -111,7 +111,7 @@ void setup()
   // attachInterrupt(button, interruptButton, FALLING);
 
   // // Configure P1Poort serial connection
-  // P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1);  // Start HardwareSerial. RX, TX
+  // P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
 
   // Connecting to Wi-Fi
   Serial.print("Connecting to WiFi");
@@ -146,7 +146,7 @@ void loop()
   // int maxRead = 0;
   // getData(maxRead);
 
-  for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++)  //this is used for testing all send modes
+  for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++) //this is used for testing all send modes
   {
     sender(sendMode);
     delay(8000);
@@ -291,11 +291,11 @@ void decodeTelegram(int startChar, int endChar)
 
     if (!foundStart)
     {
-      foundStart = checkValues(placeOfNewLine, foundStart);
+      foundStart = checkValues(placeOfNewLine, foundStart, 0);
     }
     else
     {
-      checkValues(placeOfNewLine, foundStart);
+      checkValues(placeOfNewLine, foundStart, 0);
     }
 
     placeOfNewLine = FindCharInArrayRev(telegram, '\n', endChar - startChar, placeOfNewLine) + 1;
@@ -578,10 +578,8 @@ void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
     }
   }
   break;
-
   }
-
-  serializeJson(parsedJsonDoc, sendMessage); //data in jsonChar opslaan
+  serializeJson(parsedJsonDoc, sendMessage); //
 }
 
 boolean makePostRequest2(uint8_t *sendMode)

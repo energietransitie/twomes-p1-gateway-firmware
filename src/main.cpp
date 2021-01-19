@@ -1,14 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <HTTPClient.h> // Eventueel met WiFi.h http request implementen, schilt een hoop flash geheugen
+#include <HTTPClient.h>
 #include <utils.h>
 #include <ArduinoJson.h> //this is used for parsing json
 
 #define MAXTELEGRAMLENGTH 1500    // Length of chars to read for decoding
 #define MAXSENDMESSAGELENGTH 1500 //review this, maybe this could be dynamic allocated
-
-// TEMP TCP connection
-//WiFiClient client;
 
 // Backoffice URL endpoint
 
@@ -126,17 +123,6 @@ void setup()
   }
 
   Serial.println("\nConnected to WiFi");
-
-  // TEMP setup TCP connection for debugging
-  /*
-  if(client.connect("192.168.178.129", 9090)){
-    Serial.println("Connected to telnet server!");
-  } else{
-    Serial.println("Could not connect to telnet server");
-  }
-
-  String socketServerMessage = WiFi.macAddress() + " is connected!";
-  client.println(socketServerMessage);*/
 }
 
 void loop()
@@ -151,13 +137,6 @@ void loop()
     sender(sendMode);
     delay(8000);
   }
-
-  /*
- digitalWrite(dataReqPin, LOW);
- delay(5000);
- digitalWrite(dataReqPin, HIGH);
- delay(5000);
- */
 }
 
 // This function gets called when button is pressed
@@ -635,51 +614,4 @@ boolean makePostRequest2(uint8_t *sendMode)
     }
   }
   return false;
-}
-
-void makePostRequest()
-{
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println("Creating HTTP client");
-    HTTPClient httpClient;
-
-    String postData = String("{\"dsmrVersion\": ") + dsmr_measurement[0].dsmrVersion +
-                      ", \"elecUsedT1\": " + dsmr_measurement[0].elecUsedT1 +
-                      ", \"elecUsedT2\": " + dsmr_measurement[0].elecUsedT2 +
-                      ", \"elecDeliveredT1\": " + dsmr_measurement[0].elecDeliveredT1 +
-                      ", \"elecDeliveredT2\": " + dsmr_measurement[0].elecDeliveredT2 +
-                      ", \"currentTarrif\": " + dsmr_measurement[0].currentTarrif +
-                      ", \"elecCurrentUsage\": " + dsmr_measurement[0].elecCurrentUsage +
-                      ", \"elecCurrentDeliver\": " + dsmr_measurement[0].elecCurrentDeliver +
-                      ", \"gasUsage\": " + dsmr_measurement[0].gasUsage +
-                      ", \"timeGasMeasurement\": " + convertToString(dsmr_measurement[0].timeGasMeasurement) +
-                      ", \"timeRead\": " + convertToString(dsmr_measurement[0].timeRead) +
-                      "}";
-    //Serial.println(postData);
-
-    //client.println(postData);
-    Serial.println("Starting url connection");
-    httpClient.begin(serverCredentials1.serverAddress);
-    httpClient.addHeader("Content-Type", "application/json");
-
-    Serial.println("Creating POST req");
-    int httpCode = httpClient.POST(postData);
-
-    if (httpCode > 0)
-    {
-      String payload = httpClient.getString();
-      Serial.println("\nStatuscode: " + String(httpCode));
-      Serial.println(payload);
-      httpClient.end();
-    }
-    else
-    {
-      Serial.println("Error has occurred on HTTP request");
-    }
-  }
-  else
-  {
-    Serial.println("Connection lost");
-  }
 }

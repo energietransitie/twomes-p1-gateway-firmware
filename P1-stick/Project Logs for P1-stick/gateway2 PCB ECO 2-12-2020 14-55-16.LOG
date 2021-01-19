@@ -1,0 +1,28 @@
+Removed Pin From Net: NetName=NetD1_2 Pin=J1-A1
+Removed Pin From Net: NetName=DTR_SM Pin=J1-A2
+Removed Pin From Net: NetName=GND Pin=J1-A3
+Removed Pin From Net: NetName=Tx_SM Pin=J1-A5
+Removed Pin From Net: NetName=GND Pin=J1-A6
+Change Component Footprint: Designator=J1 Old Footprint=6P6C_RJ11 New Footprint=44144-0005
+Change Component Library : Designator=S1 Old Library=Button_led.IntLib New Library=Button_led.SchLib
+Change component parameters: Designator = "R1" ("R1"); Footprint = "R0805"; UniqueID = "\THLVMZEQ" ("\THLVMZEQ")
+Change component parameters (AddParameter): Name = "Case Code (Imperial)"; Value = "0805"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Case Code (Metric)"; Value = "2012"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Case/Package"; Value = "0805"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Category"; Value = "PTC Resettable Fuses"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Hold Current"; Value = "500mA"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Manufacturer"; Value = "Murata"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Manufacturer Part Number"; Value = "PRG21BC0R2MM1RA"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Mount"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Resistance"; Value = "200mR"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier 1"; Value = "Mouser"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier Part Number 1"; Value = "81-PRG21BC0R2MM1RA"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier Unit Price 1"; Value = "€0.44997"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Termination"; Value = "SMD/SMT"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Tolerance"; Value = "20%"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "0.2"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=NetD1_2 Pin=J1-1
+Added Pin To Net: NetName=DTR_SM Pin=J1-2
+Added Pin To Net: NetName=GND Pin=J1-3
+Added Pin To Net: NetName=Tx_SM Pin=J1-5
+Added Pin To Net: NetName=GND Pin=J1-6

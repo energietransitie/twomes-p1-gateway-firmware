@@ -1,0 +1,25 @@
+Change Component Footprint: Designator=C2 Old Footprint=CAPAE109103X105M_680uF New Footprint=CAPAE144130X135M
+Change Component Footprint: Designator=C3 Old Footprint=CAPAE144130X135M New Footprint=CAPAE109103X105M_680uF
+Change Component Comment : Designator=C2 Old Comment=680uF_10V New Comment=1800uF_6V3
+Change Component Comment : Designator=C3 Old Comment=1800uF_6V3 New Comment=680uF_10V
+Change component parameters: Designator = "C2" ("C2"); Footprint = "CAPAE109103X105M_680uF"; UniqueID = "\BADCZUAS" ("\BADCZUAS")
+Change component parameters (AddParameter): Name = "Capacitance"; Value = "1.8mF"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Category"; Value = "Aluminum Electrolytic Capacitors"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Manufacturer"; Value = "Panasonic"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Manufacturer Part Number"; Value = "EEE-FN0J182UV"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Mount"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier 1"; Value = "Mouser"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier Part Number 1"; Value = "667-EEE-FN0J182UV"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier Unit Price 1"; Value = "€0.98708"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "1800uF"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Voltage Rating"; Value = "10V"; VariantName = "[No Variations]"
+Change component parameters: Designator = "C3" ("C3"); Footprint = "CAPAE144130X135M"; UniqueID = "\DUAAPNFZ" ("\DUAAPNFZ")
+Change component parameters (AddParameter): Name = "Category"; Value = "Aluminum Electrolytic Capacitors"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Manufacturer"; Value = "Rubycon"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Manufacturer Part Number"; Value = "10TRV680M10X10.5"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Mount"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier 1"; Value = "Farnell"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier Part Number 1"; Value = "2535760"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Supplier Unit Price 1"; Value = "€0.48046"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Value"; Value = "680uF"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "Voltage Rating"; Value = "10V"; VariantName = "[No Variations]"

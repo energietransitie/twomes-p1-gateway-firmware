@@ -5,10 +5,9 @@ Firmware for ESP32 to read and parse data from Smart meter, receive data from ot
 * ~~Parse P1 data~~
 * ~~Use HTTP request to send data to backoffice~~
 * Implement ESPNOW for monitor communication
-* Remove HTTPClient library and make HTTP request with WiFi library
-* Use https instead of http
+* ~~Use https instead of http~~
 * Sync RTC clock with time from smart meter readout
-* Change JSON parameters to the right format
+* ~~Change JSON parameters to the right format~~
 * Add provisioning to exchange the WiFi credentials and unique id trough App
 * Add button functionality
 * Remove debugging code

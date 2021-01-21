@@ -4,6 +4,7 @@
 #include <utils.h>
 #include <espnow_settings.h>
 #include <ArduinoJson.h> //this is used for parsing json
+#include <esp_now.h>
 
 #define MAXTELEGRAMLENGTH 1500    // Length of chars to read for decoding
 #define MAXSENDMESSAGELENGTH 1500 //review this, maybe this could be dynamic allocated
@@ -38,7 +39,30 @@ char sendMessage[MAXSENDMESSAGELENGTH]; //review this: this memory should be all
 //defines for max amount of memory allocated for measurements
 #define maxMeasurements_smartMeter 10
 #define maxMeasurements_roomTemp 10
-#define maxMeasurements_boiler 10
+#define maxMeasurements_boilerTemp 10
+
+#define macArrayLength 6 //number of position in a mac address
+
+#define smartMeter_dataType 0
+#define roomTemp_dataType 1
+#define boilerTemp_dataType 2
+
+typedef struct global_data_save_format
+{
+  //for specifying data and locating it
+  uint8_t dataType;     //see defines above
+  uint8_t dataPosition; //position in data struct
+
+  //for building JSON
+  byte macID[macArrayLength];   //id: MAC from device which took the sample(s)
+  uint64_t lastTime;            //lastTime: time at latest sample
+  uint8_t interval;             //interval: time between samples
+  uint8_t numberOfMeasurements; //total: number of Measurements in this message
+} global_data_save_format;
+
+global_data_save_format global_sample_data[maxMeasurements_smartMeter + maxMeasurements_roomTemp + maxMeasurements_boilerTemp]; //this place should be able to hold data from all sources
+
+uint8_t last_position_global_data = 0, last_position_smartMeter = 0, last_position_roomTemp = 0, last_position_boilerTemp = 0; //look up last save position(in struct array) data on fast way
 
 struct smartMeterData
 {
@@ -57,14 +81,25 @@ struct smartMeterData
 struct smartMeterData smartMeter_measurement[maxMeasurements_smartMeter];
 
 struct roomTempData
-{ //add variables for receiving data from roomTemp monitor device
+{
+  float roomTemps[maximum_samples_espnow]; //add variables for receiving data from roomTemp monitor device
 };
 struct roomTempData roomTemp_measurement[maxMeasurements_roomTemp];
 
-struct boilerData
-{ //add variables for receiving data from boiler monitor device
+struct boilerTempData
+{
+  float pipeTemps1[maximum_samples_espnow];
+  float pipeTemps2[maximum_samples_espnow]; //add variables for receiving data from boiler monitor device
 };
-struct boilerData boiler_measurement[maxMeasurements_boiler];
+struct boilerTempData boilerTemp_measurement[maxMeasurements_boilerTemp];
+
+typedef struct ESP_message
+{
+  uint8_t numberofMeasurements;
+  uint8_t intervalTime;
+  float pipeTemps1[maximum_samples_espnow];
+  float pipeTemps2[maximum_samples_espnow];
+} ESP_message;
 
 // current_measurement counter
 uint8_t current_measurementNumber = 0;
@@ -77,6 +112,8 @@ bool printDecodedData = true;
 unsigned int currentCRC = 0;
 
 // Function declaration
+boolean WiFiconfig(boolean);
+boolean ESPnowconfig(boolean);
 void getData(int);
 void printData(int, int);
 int FindCharInArrayRev(char[], char, int, int);
@@ -93,11 +130,71 @@ boolean makePostRequest2(uint8_t *sendMode);
 void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode);
 void interruptButton();
 
+#define debug_sent_ESPNOW_message 1 //for switch debugging modes
+// callback function that will be executed when data is received
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
+{
+  char macStr[18];
+  Serial.print("Packet received from: ");
+  snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
+           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+  Serial.println(macStr);
+
+  ESP_message received_ESPNOW_message;
+
+  memcpy(&received_ESPNOW_message, incomingData, sizeof(received_ESPNOW_message));
+
+  //determine what type sensor this is
+  switch (boilerTemp_dataType)
+  {
+  case roomTemp_dataType:
+  {
+    Serial.printf("This is not supported yet");
+  }
+  break;
+  case boilerTemp_dataType:
+  {
+    global_sample_data[last_position_global_data].dataType = boilerTemp_dataType; //is now hardcoded boilerTemp, roomTemp not supported yet
+
+    global_sample_data[last_position_global_data].lastTime = (1611233085 + uint8_t(last_position_global_data * 60)); //this should be the local time!
+
+    for (uint8_t counter1 = 0; counter1 < macArrayLength; counter1++) //copy mac address
+    {
+      global_sample_data[last_position_global_data].macID[counter1] = mac_addr[counter1];
+    }
+
+    global_sample_data[last_position_global_data].numberOfMeasurements = received_ESPNOW_message.numberofMeasurements;
+    global_sample_data[last_position_global_data].interval = received_ESPNOW_message.intervalTime;
+    global_sample_data[last_position_global_data].dataPosition = last_position_boilerTemp;
+
+    for (uint8_t counter1 = 0; counter1 < (received_ESPNOW_message.numberofMeasurements); counter1++)
+    {
+      boilerTemp_measurement[last_position_boilerTemp].pipeTemps1[counter1] = received_ESPNOW_message.pipeTemps1[counter1];
+      boilerTemp_measurement[last_position_boilerTemp].pipeTemps2[counter1] = received_ESPNOW_message.pipeTemps2[counter1];
+    }
+    if (last_position_boilerTemp < maxMeasurements_boilerTemp)
+    {
+      last_position_boilerTemp++;
+    }
+    else
+    {
+      Serial.printf("Memory of boilerTemp is currently full\n");
+    }
+  }
+  break;
+  }
+  last_position_global_data++;
+}
+
 void setup()
 {
   // Start terminal communication
   Serial.begin(115200);
   Serial.println("Starting...");
+  WiFi.mode(WIFI_MODE_STA);
+  Serial.print("MAC address of this gateway: ");
+  Serial.println(WiFi.macAddress());
+  WiFi.mode(WIFI_OFF);
 
   // // Pin setup
   pinMode(dataReqPin, OUTPUT);
@@ -109,41 +206,108 @@ void setup()
   digitalWrite(greenLed, HIGH);
 
   // Attatch interrupt to button
-  attachInterrupt(button, interruptButton, FALLING);
+  // attachInterrupt(button, interruptButton, FALLING);
 
-  // Configure P1Poort serial connection
-  P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
-
-  // Connecting to Wi-Fi
-  Serial.print("Connecting to WiFi");
-  WiFi.mode(WIFI_STA);
-  Serial.println("WiFi in station mode");
-  delay(1000);
-  WiFi.begin(SSID, PASS);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(500);
-  }
-
-  Serial.println("\nConnected to WiFi");
+  // // Configure P1Poort serial connection
+  // P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
+  //WiFiconfig(true);
+  printf("ESPnowconfig enabled return: %d\n", ESPnowconfig(true));
 }
 
 void loop()
 {
+  if (last_position_global_data > 0)
+  {
+    Serial.printf("last_position_global_data: %u\n", last_position_global_data);
+    Serial.printf("last_position_smartMeter: %u\n", last_position_smartMeter);
+    Serial.printf("last_position_boilerTemp: %u\n", last_position_boilerTemp);
+    Serial.printf("last_position_roomTemp: %u\n", last_position_roomTemp);
+  }
+  // Serial.println();
+  // memset(telegram, 0, sizeof(telegram)); // Empty telegram
+  // int maxRead = 0;
+  // getData(maxRead);
 
-  Serial.println();
-  memset(telegram, 0, sizeof(telegram)); // Empty telegram
-  int maxRead = 0;
-  getData(maxRead);
+  // // for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++) //this is used for testing all send modes
+  // // {
+  // //   sender(sendMode);
+  // //   delay(8000);
+  // // }
+  // sender(smartMeter_send_mode);
+  // delay(3000);
+}
 
-  // for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++) //this is used for testing all send modes
-  // {
-  //   sender(sendMode);
-  //   delay(8000);
-  // }
-  sender(smartMeter_send_mode);
-  delay(3000);
+#define WiFiconfig_debug_messages 1
+boolean WiFiconfig(boolean requestedState)
+{
+  if (requestedState)
+  {
+#if WiFiconfig_debug_messages
+    Serial.print("Connecting to WiFi");
+#endif
+    if (WiFi.mode(WIFI_STA) == false)
+    {
+      return false;
+    }
+    if (WiFi.begin(SSID, PASS) != WL_CONNECT_FAILED)
+    {
+      return false;
+    }
+    while (WiFi.status() != WL_CONNECTED) //REVIEW, here is an timeout needed
+    {
+#if WiFiconfig_debug_messages
+      Serial.print(".");
+#endif
+      delay(500);
+    }
+#if WiFiconfig_debug_messages
+    Serial.println("\nConnected to WiFi");
+#endif
+  }
+  else
+  {
+    WiFi.mode(WIFI_OFF);
+    printf("WiFi.getMode: %d", WiFi.getMode());
+    if (WiFi.getMode() == WIFI_MODE_NULL)
+    {
+      return true;
+    }
+  }
+  Serial.printf("WiFiconfig fault\n");
+  return false;
+}
+
+//input:  requested state of ESP-NOW communication
+//output: true if succeed, otherwise false
+//effect: sets ESP-NOW communication in requested state
+boolean ESPnowconfig(boolean requestedState)
+{
+  if (requestedState)
+  {
+    //digitalWrite(measureTimePin1, LOW);
+    //WiFi.softAP("bullshit", "bulllshit", espnow_channel); //REVIEW: use this to change wifi radio channel, but this should be an other function
+    WiFi.mode(WIFI_STA); //REVIEW: check if this is necessary
+    if (esp_now_init() == ESP_OK)
+    {
+      if (esp_now_register_recv_cb(OnDataRecv) == ESP_OK) // Once ESPNow is successfully Init, we will register for recv CB to, get recv packer info
+      {
+        return true;
+      }
+    }
+  }
+  else
+  {
+    if (esp_now_unregister_recv_cb() == ESP_OK)
+    {
+      if (esp_now_deinit() == ESP_OK)
+      {
+        WiFi.mode(WIFI_OFF);
+        return true;
+      }
+    }
+  }
+  Serial.println("ESPNOW config fault");
+  return false;
 }
 
 // This function gets called when button is pressed

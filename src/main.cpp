@@ -130,7 +130,7 @@ void setup()
 
 void loop()
 {
-  
+
   Serial.println();
   memset(telegram, 0, sizeof(telegram)); // Empty telegram
   int maxRead = 0;
@@ -494,9 +494,11 @@ boolean sender(uint8_t sendMode)
 {
   //uint8_t temporyTotal = 2;
   parse_data_into_json(&current_measurementNumber, &sendMode); // Changed to current_measurementNumber. This is for smart meter only!
-  if (makePostRequest2(&sendMode)){
-    
-    if(sendMode == smartMeter_send_mode){
+  if (makePostRequest2(&sendMode))
+  {
+
+    if (sendMode == smartMeter_send_mode)
+    {
       current_measurementNumber = 0; // Needs to be set to zero only if request was succesfull!
     }
     return true;

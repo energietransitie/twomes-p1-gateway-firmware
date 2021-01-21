@@ -35,11 +35,11 @@ char telegram[MAXTELEGRAMLENGTH]; // Variable for telegram data
 char sendMessage[MAXSENDMESSAGELENGTH]; //review this: this memory should be allocated in sender function
 
 //defines for max amount of memory allocated for measurements
-#define maxMeasurements_dsmr 10
+#define maxMeasurements_smartMeter 10
 #define maxMeasurements_roomTemp 10
 #define maxMeasurements_boiler 10
 
-struct dsmrData
+struct smartMeterData
 {
   byte dsmrVersion;            // DSMR versie zonder punt
   long elecUsedT1;             // Elektriciteit verbruikt tarief 1 in Watt
@@ -51,9 +51,9 @@ struct dsmrData
   long elecCurrentDeliver;     // Huidig elektriciteit levering in Watt
   long gasUsage;               // Gasverbruik in dm3
   char timeGasMeasurement[12]; // Tijdstip waarop gas voor het laats is gemeten YY:MM:DD:HH:MM:SS
-  char timeRead[12];           // Tijdstip waarop meter voor het laats is uitgelezen YY:MM:DD:HH:MM:SS
+  //char timeRead[12];           // Tijdstip waarop meter voor het laats is uitgelezen YY:MM:DD:HH:MM:SS
 };
-struct dsmrData dsmr_measurement[maxMeasurements_dsmr];
+struct smartMeterData smartMeter_measurement[maxMeasurements_smartMeter];
 
 struct roomTempData
 { //add variables for receiving data from roomTemp monitor device
@@ -64,6 +64,9 @@ struct boilerData
 { //add variables for receiving data from boiler monitor device
 };
 struct boilerData boiler_measurement[maxMeasurements_boiler];
+
+// current_measurement counter
+uint8_t current_measurementNumber = 0;
 
 // Debug values:
 bool printAllData = true;
@@ -77,7 +80,7 @@ void getData(int);
 void printData(int, int);
 int FindCharInArrayRev(char[], char, int, int);
 void printValue(int, int);
-bool checkValues(int, bool, byte);
+bool checkValues(int, bool);
 void decodeTelegram(int, int);
 bool procesData(int);
 bool crcCheck(int, int);
@@ -127,6 +130,7 @@ void setup()
 
 void loop()
 {
+  
   Serial.println();
   memset(telegram, 0, sizeof(telegram)); // Empty telegram
   int maxRead = 0;
@@ -225,6 +229,7 @@ bool procesData(int maxRead)
       decodeTelegram(startChar, endChar);
       if (crcCheck(startChar, endChar))
       {
+        current_measurementNumber++;
         return true; // Return true if CRC check is valid
       }
       else
@@ -272,11 +277,11 @@ void decodeTelegram(int startChar, int endChar)
 
     if (!foundStart)
     {
-      foundStart = checkValues(placeOfNewLine, foundStart, 0);
+      foundStart = checkValues(placeOfNewLine, foundStart);
     }
     else
     {
-      checkValues(placeOfNewLine, foundStart, 0);
+      checkValues(placeOfNewLine, foundStart);
     }
 
     placeOfNewLine = FindCharInArrayRev(telegram, '\n', endChar - startChar, placeOfNewLine) + 1;
@@ -285,7 +290,7 @@ void decodeTelegram(int startChar, int endChar)
 
 // Checks to what variable the readed parameter belongs and assigns the parameter to the variable by calling the function updateValue(int, int)
 // Also does CRC for each line
-bool checkValues(int placeOfNewLine, bool foundStart, byte current_measurementNumber)
+bool checkValues(int placeOfNewLine, bool foundStart)
 {
   int endChar = FindCharInArrayRev(telegram, '\n', placeOfNewLine + 300, placeOfNewLine);
   if ((strncmp(telegram + placeOfNewLine, "/", strlen("/")) == 0) && !foundStart)
@@ -305,88 +310,89 @@ bool checkValues(int placeOfNewLine, bool foundStart, byte current_measurementNu
   { // DSMR-versie
     Serial.print("DSMR-versie: ");
     sscanf(telegram + placeOfNewLine, "1-3:0.2.8(%ld", &round);
-    dsmr_measurement[current_measurementNumber].dsmrVersion = round;
-    Serial.println(dsmr_measurement[current_measurementNumber].dsmrVersion);
+    smartMeter_measurement[current_measurementNumber].dsmrVersion = round;
+    Serial.println(smartMeter_measurement[current_measurementNumber].dsmrVersion);
   }
   else if (strncmp(telegram + placeOfNewLine, "1-0:1.8.1", strlen("1-0:1.8.1")) == 0)
   { // Elektriciteit verbruikt T1
     Serial.print("Elektriciteit verbruikt T1: ");
     sscanf(telegram + placeOfNewLine, "1-0:1.8.1(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].elecUsedT1 = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].elecUsedT1);
+    smartMeter_measurement[current_measurementNumber].elecUsedT1 = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].elecUsedT1);
   }
   else if (strncmp(telegram + placeOfNewLine, "1-0:1.8.2", strlen("1-0:1.8.2")) == 0)
   { // Elektriciteit verbruikt T2
     Serial.print("Elektriciteit verbruikt T2: ");
     sscanf(telegram + placeOfNewLine, "1-0:1.8.2(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].elecUsedT2 = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].elecUsedT2);
+    smartMeter_measurement[current_measurementNumber].elecUsedT2 = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].elecUsedT2);
   }
   else if (strncmp(telegram + placeOfNewLine, "1-0:2.8.1", strlen("1-0:2.8.1")) == 0)
   { // Elektriciteit geleverd T1
     Serial.print("Elektriciteit geleverd T1: ");
     sscanf(telegram + placeOfNewLine, "1-0:2.8.1(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].elecDeliveredT1 = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].elecDeliveredT1);
+    smartMeter_measurement[current_measurementNumber].elecDeliveredT1 = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].elecDeliveredT1);
   }
   else if (strncmp(telegram + placeOfNewLine, "1-0:2.8.2", strlen("1-0:2.8.2")) == 0)
   { // Elektriciteit geleverd T2
     Serial.print("Elektriciteit geleverd T2: ");
     sscanf(telegram + placeOfNewLine, "1-0:2.8.2(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].elecDeliveredT2 = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].elecDeliveredT2);
+    smartMeter_measurement[current_measurementNumber].elecDeliveredT2 = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].elecDeliveredT2);
   }
   else if (strncmp(telegram + placeOfNewLine, "0-0:96.14.0", strlen("0-0:96.14.0")) == 0)
   { // Huidig tarief
     Serial.print("Hudig tarief: ");
     sscanf(telegram + placeOfNewLine, "0-0:96.14.0(%ld", &round);
-    dsmr_measurement[current_measurementNumber].currentTarrif = round;
-    Serial.println(dsmr_measurement[current_measurementNumber].currentTarrif);
+    smartMeter_measurement[current_measurementNumber].currentTarrif = round;
+    Serial.println(smartMeter_measurement[current_measurementNumber].currentTarrif);
   }
   else if (strncmp(telegram + placeOfNewLine, "1-0:1.7.0", strlen("1-0:1.7.0")) == 0)
   { // Actueel energie verbruik
     Serial.print("Actueel elektriciteits verbruik: ");
     sscanf(telegram + placeOfNewLine, "1-0:1.7.0(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].elecCurrentUsage = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].elecCurrentUsage);
+    smartMeter_measurement[current_measurementNumber].elecCurrentUsage = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].elecCurrentUsage);
   }
   else if (strncmp(telegram + placeOfNewLine, "1-0:2.7.0", strlen("1-0:2.7.0")) == 0)
   { // Actueel energie levering
     Serial.print("Actueel elektriciteit teruglevering: ");
     sscanf(telegram + placeOfNewLine, "1-0:2.7.0(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].elecCurrentDeliver = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].elecCurrentDeliver);
+    smartMeter_measurement[current_measurementNumber].elecCurrentDeliver = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].elecCurrentDeliver);
   }
   else if (strncmp(telegram + placeOfNewLine, "0-1:24.2.1", strlen("0-1:24.2.1")) == 0)
   { // Gasverbruik + tijdstip gemeten
     Serial.print("Gasverbruik: ");
     sscanf(telegram + placeOfNewLine + strlen("0-1:24.2.1") + 15, "(%ld.%ld", &round, &decimal);
-    dsmr_measurement[current_measurementNumber].gasUsage = round * 1000 + decimal;
-    Serial.println(dsmr_measurement[current_measurementNumber].gasUsage);
+    smartMeter_measurement[current_measurementNumber].gasUsage = round * 1000 + decimal;
+    Serial.println(smartMeter_measurement[current_measurementNumber].gasUsage);
     Serial.print("Tijdstip gas gemeten: ");
     int j = 0;
-    int countUntil = placeOfNewLine + strlen("0-1:24.2.1") + sizeof(dsmr_measurement[current_measurementNumber].timeGasMeasurement) + 1;
+    int countUntil = placeOfNewLine + strlen("0-1:24.2.1") + sizeof(smartMeter_measurement[current_measurementNumber].timeGasMeasurement) + 1;
     for (int i = placeOfNewLine + strlen("0-1:24.2.1") + 1; i < countUntil; i++)
     {
-      dsmr_measurement[current_measurementNumber].timeGasMeasurement[j] = telegram[i];
-      Serial.print(dsmr_measurement[current_measurementNumber].timeGasMeasurement[j]);
+      smartMeter_measurement[current_measurementNumber].timeGasMeasurement[j] = telegram[i];
+      Serial.print(smartMeter_measurement[current_measurementNumber].timeGasMeasurement[j]);
       j++;
     }
     Serial.print("\n");
   }
+  /*
   else if (strncmp(telegram + placeOfNewLine, "0-0:1.0.0", strlen("0-0:1.0.0")) == 0)
   { // Tijd data uitgelezen
     Serial.print("Tijd meter uitgelezen: ");
     int j = 0;
-    int countUntil = placeOfNewLine + strlen("0-0:1.0.0") + sizeof(dsmr_measurement[current_measurementNumber].timeRead) + 1;
+    int countUntil = placeOfNewLine + strlen("0-0:1.0.0") + sizeof(smartMeter_measurement[current_measurementNumber].timeRead) + 1;
     for (int i = placeOfNewLine + strlen("0-0:1.0.0") + 1; i < countUntil; i++)
     {
-      dsmr_measurement[current_measurementNumber].timeRead[j] = telegram[i];
-      Serial.print(dsmr_measurement[current_measurementNumber].timeRead[j]);
+      smartMeter_measurement[current_measurementNumber].timeRead[j] = telegram[i];
+      Serial.print(smartMeter_measurement[current_measurementNumber].timeRead[j]);
       j++;
     }
     Serial.print("\n");
-  }
+  }*/
 
   return false;
 }
@@ -486,11 +492,15 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
 
 boolean sender(uint8_t sendMode)
 {
-  uint8_t temporyTotal = 2;
-  parse_data_into_json(&temporyTotal, &sendMode);
-  if (makePostRequest2(&sendMode))
+  //uint8_t temporyTotal = 2;
+  parse_data_into_json(&current_measurementNumber, &sendMode); // Changed to current_measurementNumber. This is for smart meter only!
+  if (makePostRequest2(&sendMode)){
+    
+    if(sendMode == smartMeter_send_mode){
+      current_measurementNumber = 0; // Needs to be set to zero only if request was succesfull!
+    }
     return true;
-
+  }
   return false;
 }
 
@@ -524,16 +534,16 @@ void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
     JsonArray tgas = data.createNestedArray("tgas");
     for (byte index1 = 0; index1 < *numberMeasurements; index1++)
     {
-      dsmr.add(dsmr_measurement[index1].dsmrVersion);
-      evt1.add(dsmr_measurement[index1].dsmrVersion); //fill in the correct value
-      evt2.add(dsmr_measurement[index1].dsmrVersion); //fill in the correct value
-      egt1.add(dsmr_measurement[index1].dsmrVersion); //fill in the correct value
-      egt2.add(dsmr_measurement[index1].dsmrVersion); //fill in the correct value
-      ht.add(dsmr_measurement[index1].dsmrVersion);   //fill in the correct value
-      ehv.add(dsmr_measurement[index1].dsmrVersion);  //fill in the correct value
-      ehl.add(dsmr_measurement[index1].dsmrVersion);  //fill in the correct value
-      gas.add(dsmr_measurement[index1].gasUsage);
-      tgas.add("1610212946");
+      dsmr.add(smartMeter_measurement[index1].dsmrVersion);
+      evt1.add(smartMeter_measurement[index1].elecUsedT1);
+      evt2.add(smartMeter_measurement[index1].elecUsedT2);
+      egt1.add(smartMeter_measurement[index1].elecDeliveredT1);
+      egt2.add(smartMeter_measurement[index1].elecDeliveredT2);
+      ht.add(smartMeter_measurement[index1].currentTarrif);
+      ehv.add(smartMeter_measurement[index1].elecCurrentUsage);
+      ehl.add(smartMeter_measurement[index1].elecCurrentDeliver);
+      gas.add(smartMeter_measurement[index1].gasUsage);
+      tgas.add(smartMeter_measurement[index1].timeGasMeasurement);
     }
   }
   break;
@@ -543,7 +553,7 @@ void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
     JsonArray roomTemp = data.createNestedArray("roomTemp");
     for (byte index1 = 0; index1 < *numberMeasurements; index1++)
     {
-      roomTemp.add(dsmr_measurement[index1].dsmrVersion); //connect to correct data
+      roomTemp.add(smartMeter_measurement[index1].dsmrVersion); //connect to correct data
     }
   }
   break;
@@ -554,8 +564,8 @@ void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
     JsonArray pipeTemp2 = data.createNestedArray("pipeTemp2");
     for (byte index1 = 0; index1 < *numberMeasurements; index1++)
     {
-      pipeTemp1.add(dsmr_measurement[index1].dsmrVersion); //connect to correct data
-      pipeTemp2.add(dsmr_measurement[index1].dsmrVersion); //connect to correct data
+      pipeTemp1.add(smartMeter_measurement[index1].dsmrVersion); //connect to correct data
+      pipeTemp2.add(smartMeter_measurement[index1].dsmrVersion); //connect to correct data
     }
   }
   break;

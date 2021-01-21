@@ -123,11 +123,11 @@ void decodeTelegram(int, int);
 bool procesData(int);
 bool crcCheck(int, int);
 unsigned int CRC16(unsigned int, unsigned char *, int);
-boolean sender(uint8_t sendMode);
+boolean sender();
 String convertToString(char[]);
 void makePostRequest();
-boolean makePostRequest2(uint8_t *sendMode);
-void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode);
+boolean makePostRequest2(uint8_t);
+uint8_t parse_data_into_json(uint8_t *selectedPosition);
 void interruptButton();
 
 #define debug_sent_ESPNOW_message 1 //for switch debugging modes
@@ -154,6 +154,11 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
   break;
   case boilerTemp_dataType:
   {
+    if (last_position_boilerTemp >= maxMeasurements_boilerTemp)
+    {
+      Serial.printf("boilerTemp storage full, so return from here\n"); //REVIEW the old data should be renewed with the old data?
+      return;
+    }
     global_sample_data[last_position_global_data].dataType = boilerTemp_dataType; //is now hardcoded boilerTemp, roomTemp not supported yet
 
     global_sample_data[last_position_global_data].lastTime = (1611233085 + uint8_t(last_position_global_data * 60)); //this should be the local time!
@@ -214,14 +219,34 @@ void setup()
   printf("ESPnowconfig enabled return: %d\n", ESPnowconfig(true));
 }
 
+uint8_t tempSave_last_position_global_data = 0;
 void loop()
 {
-  if (last_position_global_data > 0)
+  if (last_position_global_data != tempSave_last_position_global_data)
   {
+    tempSave_last_position_global_data = last_position_global_data;
     Serial.printf("last_position_global_data: %u\n", last_position_global_data);
     Serial.printf("last_position_smartMeter: %u\n", last_position_smartMeter);
     Serial.printf("last_position_boilerTemp: %u\n", last_position_boilerTemp);
     Serial.printf("last_position_roomTemp: %u\n", last_position_roomTemp);
+  }
+  if (last_position_global_data != 0) //there is data to send, so do this
+  {
+    ESPnowconfig(false);
+    if (WiFiconfig(true))
+    {
+      while (last_position_global_data > 0 && sender())
+      {
+        Serial.printf("Sending thing now, last_position_global_data: %u\n", last_position_global_data);
+      }
+      WiFiconfig(false);
+      ESPnowconfig(true);
+    }
+    else
+    {
+      Serial.printf("No connection\n");
+      delay(1000);
+    }
   }
   // Serial.println();
   // memset(telegram, 0, sizeof(telegram)); // Empty telegram
@@ -243,16 +268,19 @@ boolean WiFiconfig(boolean requestedState)
   if (requestedState)
   {
 #if WiFiconfig_debug_messages
-    Serial.print("Connecting to WiFi");
+    Serial.println("Connecting to WiFi");
 #endif
     if (WiFi.mode(WIFI_STA) == false)
     {
+      Serial.printf("Wifi mode error\n");
       return false;
     }
-    if (WiFi.begin(SSID, PASS) != WL_CONNECT_FAILED)
-    {
-      return false;
-    }
+    WiFi.begin(SSID, PASS);
+    // if (WiFi.begin(SSID, PASS) != WL_CONNECT_FAILED)
+    // {
+    //   Serial.printf("Wifi credentials error\n");
+    //   return false;
+    // }
     while (WiFi.status() != WL_CONNECTED) //REVIEW, here is an timeout needed
     {
 #if WiFiconfig_debug_messages
@@ -262,6 +290,7 @@ boolean WiFiconfig(boolean requestedState)
     }
 #if WiFiconfig_debug_messages
     Serial.println("\nConnected to WiFi");
+    return true;
 #endif
   }
   else
@@ -655,39 +684,93 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
   return crc;
 }
 
-boolean sender(uint8_t sendMode)
-{
-  //uint8_t temporyTotal = 2;
-  parse_data_into_json(&current_measurementNumber, &sendMode); // Changed to current_measurementNumber. This is for smart meter only!
-  if (makePostRequest2(&sendMode))
-  {
+#define return_parse_data_into_json_error 0
+#define return_parse_data_into_json_smartMeterData 1
+#define return_parse_data_into_json_roomTempData 2
+#define return_parse_data_into_json_boilerTempData 3
 
-    if (sendMode == smartMeter_send_mode)
+boolean sender()
+{
+  uint8_t answerFromThis = parse_data_into_json(&last_position_global_data);
+  Serial.printf("answerFromThis= %u\n", answerFromThis);
+  switch (answerFromThis)
+  {
+  case return_parse_data_into_json_error:
+  {
+    printf("error in parser\n");
+    return false;
+  }
+  break;
+  case return_parse_data_into_json_smartMeterData:
+  {
+    printf("Send smartMeterData\n");
+    if (makePostRequest2(smartMeter_send_mode))
     {
-      current_measurementNumber = 0; // Needs to be set to zero only if request was succesfull!
+      last_position_global_data--;
+      last_position_smartMeter--;
+      return true;
     }
-    return true;
+    else
+    {
+      printf("Fault smartMeterData\n");
+    }
+  }
+  break;
+  case return_parse_data_into_json_roomTempData:
+  {
+    printf("Send smartMeterData\n");
+    if (makePostRequest2(roomTemp_send_mode))
+    {
+      last_position_global_data--;
+      last_position_roomTemp--;
+      return true;
+    }
+    else
+    {
+      printf("Fault smartMeterData\n");
+    }
+  }
+  break;
+  case return_parse_data_into_json_boilerTempData:
+  {
+    printf("Send smartMeterData\n");
+    if (makePostRequest2(boilerTemp_send_mode))
+    {
+      last_position_global_data--;
+      last_position_boilerTemp--;
+      return true;
+    }
+    else
+    {
+      printf("Fault smartMeterData\n");
+    }
+  }
+  break;
   }
   return false;
 }
 
-void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
+//output: 0: error, 1: parsed smartMeterData, 2: parsed roomTempData, 3: parsed boilerTempData
+uint8_t parse_data_into_json(uint8_t *selectedPosition)
 {
   StaticJsonDocument<MAXSENDMESSAGELENGTH> parsedJsonDoc; //maybe we could make this dynamic
 
-  parsedJsonDoc["id"] = "AA:AA:AA:AA:AA"; //connect to correct data
+  char tempMac[macArrayLength * 3];
+  snprintf(tempMac, sizeof(tempMac), "%02x:%02x:%02x:%02x:%02x:%02x",
+           global_sample_data[*selectedPosition].macID[0], global_sample_data[*selectedPosition].macID[1], global_sample_data[*selectedPosition].macID[2], global_sample_data[*selectedPosition].macID[3], global_sample_data[*selectedPosition].macID[4], global_sample_data[*selectedPosition].macID[5]);
+  parsedJsonDoc["id"] = tempMac; //connect to correct data
 
   JsonObject dataSpec = parsedJsonDoc.createNestedObject("dataSpec");
-  dataSpec["lastTime"] = "1610112946"; //connect to correct data
-  dataSpec["interval"] = 10;           //correct to current data
-  dataSpec["total"] = *numberMeasurements;
+  dataSpec["lastTime"] = 0;                                              //global_sample_data[*selectedPosition].lastTime; //connect to correct data
+  dataSpec["interval"] = global_sample_data[*selectedPosition].interval; //correct to current data
+  dataSpec["total"] = global_sample_data[*selectedPosition].numberOfMeasurements;
 
   JsonObject data = parsedJsonDoc.createNestedObject("data");
-
-  switch (*sendMode)
+  printf("global_sample_data[*selectedPosition].dataType = %u\n", global_sample_data[*selectedPosition].dataType);
+  switch (global_sample_data[*selectedPosition].dataType)
   {
 
-  case smartMeter_send_mode:
+  case smartMeter_dataType:
   {
     JsonArray dsmr = data.createNestedArray("dsmr");
     JsonArray evt1 = data.createNestedArray("evt1");
@@ -699,7 +782,7 @@ void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
     JsonArray ehl = data.createNestedArray("ehl");
     JsonArray gas = data.createNestedArray("gas");
     JsonArray tgas = data.createNestedArray("tgas");
-    for (byte index1 = 0; index1 < *numberMeasurements; index1++)
+    for (byte index1 = 0; index1 < global_sample_data[*selectedPosition].numberOfMeasurements; index1++)
     {
       dsmr.add(smartMeter_measurement[index1].dsmrVersion);
       evt1.add(smartMeter_measurement[index1].elecUsedT1);
@@ -712,35 +795,41 @@ void parse_data_into_json(uint8_t *numberMeasurements, uint8_t *sendMode)
       gas.add(smartMeter_measurement[index1].gasUsage);
       tgas.add(smartMeter_measurement[index1].timeGasMeasurement);
     }
+    serializeJson(parsedJsonDoc, sendMessage);
+    return return_parse_data_into_json_smartMeterData;
   }
   break;
 
-  case roomTemp_send_mode:
+  case roomTemp_dataType:
   {
     JsonArray roomTemp = data.createNestedArray("roomTemp");
-    for (byte index1 = 0; index1 < *numberMeasurements; index1++)
+    for (byte index1 = 0; index1 < global_sample_data[*selectedPosition].numberOfMeasurements; index1++)
     {
-      roomTemp.add(smartMeter_measurement[index1].dsmrVersion); //connect to correct data
+      roomTemp.add(roomTemp_measurement[global_sample_data[*selectedPosition].dataPosition].roomTemps[index1]); //connect to correct data
     }
+    serializeJson(parsedJsonDoc, sendMessage);
+    return return_parse_data_into_json_roomTempData;
   }
   break;
 
-  case boilerTemp_send_mode:
+  case boilerTemp_dataType:
   {
     JsonArray pipeTemp1 = data.createNestedArray("pipeTemp1");
     JsonArray pipeTemp2 = data.createNestedArray("pipeTemp2");
-    for (byte index1 = 0; index1 < *numberMeasurements; index1++)
+    for (byte index1 = 0; index1 < global_sample_data[*selectedPosition].numberOfMeasurements; index1++)
     {
-      pipeTemp1.add(smartMeter_measurement[index1].dsmrVersion); //connect to correct data
-      pipeTemp2.add(smartMeter_measurement[index1].dsmrVersion); //connect to correct data
+      pipeTemp1.add(boilerTemp_measurement[global_sample_data[*selectedPosition].dataPosition].pipeTemps1[index1]); //connect to correct data
+      pipeTemp2.add(boilerTemp_measurement[global_sample_data[*selectedPosition].dataPosition].pipeTemps2[index1]); //connect to correct data
     }
+    serializeJson(parsedJsonDoc, sendMessage);
+    return return_parse_data_into_json_boilerTempData;
   }
   break;
   }
-  serializeJson(parsedJsonDoc, sendMessage); //
+  return return_parse_data_into_json_error;
 }
 
-boolean makePostRequest2(uint8_t *sendMode)
+boolean makePostRequest2(uint8_t sendMode)
 {
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -754,7 +843,7 @@ boolean makePostRequest2(uint8_t *sendMode)
       {
         HTTPClient https;
         //Serial.printf("[HTTPS] Connected to server...\n");
-        if (https.begin(*client, serverCredentials1.serverAddress, serverCredentials1.serverPort, serverCredentials1.serverURI[*sendMode], true))
+        if (https.begin(*client, serverCredentials1.serverAddress, serverCredentials1.serverPort, serverCredentials1.serverURI[sendMode], true))
         {
 
           int httpCode = https.POST(sendMessage);

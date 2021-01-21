@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <utils.h>
+#include <espnow_settings.h>
 #include <ArduinoJson.h> //this is used for parsing json
 
 #define MAXTELEGRAMLENGTH 1500    // Length of chars to read for decoding

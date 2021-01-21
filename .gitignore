@@ -4,3 +4,5 @@
 .vscode/launch.json
 .vscode/ipch
 src/utils.h
+
+src/espnow_settings.h

@@ -96,19 +96,19 @@ void setup()
   Serial.println("Starting...");
 
   // // Pin setup
-  // pinMode(dataReqPin, OUTPUT);
-  // pinMode(redLed, OUTPUT);
-  // pinMode(greenLed, OUTPUT);
-  // pinMode(button, INPUT);
-  // digitalWrite(dataReqPin, HIGH);
-  // digitalWrite(redLed, HIGH);
-  // digitalWrite(greenLed, HIGH);
+  pinMode(dataReqPin, OUTPUT);
+  pinMode(redLed, OUTPUT);
+  pinMode(greenLed, OUTPUT);
+  pinMode(button, INPUT);
+  digitalWrite(dataReqPin, HIGH);
+  digitalWrite(redLed, HIGH);
+  digitalWrite(greenLed, HIGH);
 
-  // // Attatch interrupt to button
-  // attachInterrupt(button, interruptButton, FALLING);
+  // Attatch interrupt to button
+  attachInterrupt(button, interruptButton, FALLING);
 
-  // // Configure P1Poort serial connection
-  // P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
+  // Configure P1Poort serial connection
+  P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
 
   // Connecting to Wi-Fi
   Serial.print("Connecting to WiFi");
@@ -127,16 +127,18 @@ void setup()
 
 void loop()
 {
-  // Serial.println();
-  // memset(telegram, 0, sizeof(telegram)); // Empty telegram
-  // int maxRead = 0;
-  // getData(maxRead);
+  Serial.println();
+  memset(telegram, 0, sizeof(telegram)); // Empty telegram
+  int maxRead = 0;
+  getData(maxRead);
 
-  for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++) //this is used for testing all send modes
-  {
-    sender(sendMode);
-    delay(8000);
-  }
+  // for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++) //this is used for testing all send modes
+  // {
+  //   sender(sendMode);
+  //   delay(8000);
+  // }
+  sender(smartMeter_send_mode);
+  delay(3000);
 }
 
 // This function gets called when button is pressed

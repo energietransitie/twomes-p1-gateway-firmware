@@ -13,8 +13,9 @@ Firmware for ESP32 to read and parse data from Smart meter, receive data from ot
 * Use esp32 8mB flash for BLE provisioning
 * Test provisioning and port to current main software
 * Add button and LED functionality
-* send oldest(cached/buffered) data first instead of newest
-* improve timing/ system states
+* Send oldest(cached/buffered) data first instead of newest
+* Improve timing/ system states
+* Variable "amount_filled_global_data_positions" is used by two cores for ESPNOW callback "OnDataRecv" and in loop to create smartmeter message. Suggest to make this failproof
 * Remove debugging code
 
 ## Dependencies

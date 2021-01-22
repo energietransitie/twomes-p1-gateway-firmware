@@ -6,22 +6,16 @@ Firmware for ESP32 to read and parse data from Smart meter, receive data from ot
 * ~~Use HTTP request to send data to backoffice~~
 * ~~Implement ESPNOW for monitor communication~~
 * ~~Use https instead of http~~
-<<<<<<< HEAD
 * ~~Change JSON parameters to the right format~~
 * Sync RTC clock with time from smart meter readout
 * Add provisioning to exchange the WiFi credentials and unique id trough App
-* Add button and LED functionality
-* 
-=======
-* Sync RTC clock with time from smart meter readout/NTP support
-* ~~Change JSON parameters to the right format~~
-* ~~Add provisioning to exchange the WiFi credentials and unique id trough App~~
+* ~~Compatible for esp32 with more then 4mB flash~~
+* Use esp32 8mB flash for BLE provisioning
 * Test provisioning and port to current main software
-* Add button functionality
->>>>>>> 76ebfe07750e3e7be2eb9f9670ed1e28db6655db
-* Remove debugging code
+* Add button and LED functionality
 * send oldest(cached/buffered) data first instead of newest
 * improve timing/ system states
+* Remove debugging code
 
 ## Dependencies
 ```
@@ -32,6 +26,7 @@ Firmware for ESP32 to read and parse data from Smart meter, receive data from ot
 #include <espnow_settings.h>
 #include <ArduinoJson.h>
 #include <esp_now.h>
+#include <BLE.h>
 ```
 
 ## Header files for program settings
@@ -134,18 +129,3 @@ Boiler temperature monitor
 }
 
 ```
-<<<<<<< HEAD
-=======
-
-## Dependencies
-```
-#include <Arduino.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <utils.h>
-#include <espnow_settings.h>
-#include <ArduinoJson.h>
-#include <esp_now.h>
-#include <BLE.h>
-```
->>>>>>> 76ebfe07750e3e7be2eb9f9670ed1e28db6655db

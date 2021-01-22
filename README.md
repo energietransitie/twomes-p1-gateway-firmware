@@ -1,4 +1,4 @@
-# P1 Poort logger
+# P1 Poort logger/ gateway
 Firmware for ESP32 to read and parse data from Smart meter, receive data from other measurement devices trough ESPNOW, and send all this data to the backoffice trough HTTPS POST
 
 ## TODO's and considerations
@@ -6,12 +6,22 @@ Firmware for ESP32 to read and parse data from Smart meter, receive data from ot
 * ~~Use HTTP request to send data to backoffice~~
 * ~~Implement ESPNOW for monitor communication~~
 * ~~Use https instead of http~~
+<<<<<<< HEAD
 * ~~Change JSON parameters to the right format~~
 * Sync RTC clock with time from smart meter readout
 * Add provisioning to exchange the WiFi credentials and unique id trough App
 * Add button and LED functionality
 * 
+=======
+* Sync RTC clock with time from smart meter readout/NTP support
+* ~~Change JSON parameters to the right format~~
+* ~~Add provisioning to exchange the WiFi credentials and unique id trough App~~
+* Test provisioning and port to current main software
+* Add button functionality
+>>>>>>> 76ebfe07750e3e7be2eb9f9670ed1e28db6655db
 * Remove debugging code
+* send oldest(cached/buffered) data first instead of newest
+* improve timing/ system states
 
 ## Dependencies
 ```
@@ -124,3 +134,18 @@ Boiler temperature monitor
 }
 
 ```
+<<<<<<< HEAD
+=======
+
+## Dependencies
+```
+#include <Arduino.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <utils.h>
+#include <espnow_settings.h>
+#include <ArduinoJson.h>
+#include <esp_now.h>
+#include <BLE.h>
+```
+>>>>>>> 76ebfe07750e3e7be2eb9f9670ed1e28db6655db

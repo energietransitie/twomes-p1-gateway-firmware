@@ -227,7 +227,7 @@ void setup()
   printf("ESPnowconfig enabled return: %d\n", ESPnowconfig(true));
 }
 
-uint8_t tempSave_amount_filled_global_data_positions = 0;
+uint8_t tempSave_amount_filled_global_data_positions = 0;   //to get an Serial message when there was an new measurement
 uint64_t lastSendTime = 0, last_smartMeter_contact = 0; //to save last time
 
 void loop()
@@ -243,7 +243,7 @@ void loop()
 #define start_send_from_global_data_positions 5 //filled global data positions should be this value before send action will start
 #define start_send_with_interval_time 10        //in seconds,
 #define smartMeter_get_interval_time 5          //in seconds
-#define enableSmartmeter 1
+#define enableSmartmeter 0
 
   if ((millis() - last_smartMeter_contact) > (smartMeter_get_interval_time * 1000) && enableSmartmeter)
   {

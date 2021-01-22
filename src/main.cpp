@@ -6,23 +6,13 @@
 #include <ArduinoJson.h> //this is used for parsing json
 #include <esp_now.h>
 
+//debug Messages switching
+#define WiFiconfig_debug_messages 1
+bool printAllData = true;
+bool printDecodedData = true;
+
 #define MAXTELEGRAMLENGTH 1500    // Length of chars to read for decoding
 #define MAXSENDMESSAGELENGTH 1500 //review this, maybe this could be dynamic allocated
-
-// Backoffice URL endpoint
-
-//defines for selecting send_mode
-#define numberOfModes 3
-#define smartMeter_send_mode 0
-#define roomTemp_send_mode 1
-#define boilerTemp_send_mode 2
-
-struct serverCredentials
-{
-  const char *serverAddress = defaultserverAddress;
-  const uint16_t serverPort = defaultServerPort;
-  const char *serverURI[numberOfModes] = {smartMeterUri, roomTempUri, boilerTempUri};
-} serverCredentials1;
 
 //Pin setup
 HardwareSerial P1Poort(2);     // Use UART2
@@ -34,7 +24,7 @@ const int button = 19;
 
 char telegram[MAXTELEGRAMLENGTH]; // Variable for telegram data
 
-char sendMessage[MAXSENDMESSAGELENGTH]; //review this: this memory should be allocated in sender function
+char sendMessage[MAXSENDMESSAGELENGTH]; //REVIEW, this memory should be allocated in sender function
 
 //defines for max amount of memory allocated for measurements
 #define maxMeasurements_smartMeter 10
@@ -43,9 +33,29 @@ char sendMessage[MAXSENDMESSAGELENGTH]; //review this: this memory should be all
 
 #define macArrayLength 6 //number of position in a mac address
 
+//defines for selecting send_mode
+#define numberOfModes 3
+#define smartMeter_send_mode 0
+#define roomTemp_send_mode 1
+#define boilerTemp_send_mode 2
+
+//define dataTypes
 #define smartMeter_dataType 0
 #define roomTemp_dataType 1
 #define boilerTemp_dataType 2
+
+//define returns from json parser
+#define return_parse_data_into_json_error 0
+#define return_parse_data_into_json_smartMeterData 1
+#define return_parse_data_into_json_roomTempData 2
+#define return_parse_data_into_json_boilerTempData 3
+
+struct serverCredentials //for saving server connection settings
+{
+  const char *serverAddress = defaultserverAddress;
+  const uint16_t serverPort = defaultServerPort;
+  const char *serverURI[numberOfModes] = {smartMeterUri, roomTempUri, boilerTempUri};
+} serverCredentials1; //allocate memory for this
 
 typedef struct global_data_save_format
 {
@@ -62,7 +72,7 @@ typedef struct global_data_save_format
 
 global_data_save_format global_sample_data[maxMeasurements_smartMeter + maxMeasurements_roomTemp + maxMeasurements_boilerTemp]; //this place should be able to hold data from all sources
 
-uint8_t last_position_global_data = 0, last_position_smartMeter = 0, last_position_roomTemp = 0, last_position_boilerTemp = 0; //look up last save position(in struct array) data on fast way
+uint8_t amount_filled_global_data_positions = 0, amount_filled_smartMeter_positions = 0, amount_filled_roomTemp_positions = 0, amount_filled_boilerTemp_positions = 0; //counts saved measurements by type
 
 struct smartMeterData
 {
@@ -104,10 +114,6 @@ typedef struct ESP_message
 // current_measurement counter
 uint8_t current_measurementNumber = 0;
 
-// Debug values:
-bool printAllData = true;
-bool printDecodedData = true;
-
 // CRC
 unsigned int currentCRC = 0;
 
@@ -130,19 +136,24 @@ boolean makePostRequest2(uint8_t);
 uint8_t parse_data_into_json(uint8_t *selectedPosition);
 void interruptButton();
 
-#define debug_sent_ESPNOW_message 1 //for switch debugging modes
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 {
   char macStr[18];
-  Serial.print("Packet received from: ");
+  //Serial.print("Packet received from: ");
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-  Serial.println(macStr);
+  //Serial.println(macStr);
 
   ESP_message received_ESPNOW_message;
 
   memcpy(&received_ESPNOW_message, incomingData, sizeof(received_ESPNOW_message));
+
+  // if (amount_filled_global_data_positions == (maxMeasurements_smartMeter + maxMeasurements_roomTemp + maxMeasurements_boilerTemp)) //since memory allocation is static this is not needed
+  // {
+  //   printf("global_data_positions are full\n"); //REVIEW the old data should be renewed with the old data?
+  //   return;
+  // }
 
   //determine what type sensor this is
   switch (boilerTemp_dataType)
@@ -154,41 +165,35 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
   break;
   case boilerTemp_dataType:
   {
-    if (last_position_boilerTemp >= maxMeasurements_boilerTemp)
+    if (amount_filled_boilerTemp_positions >= maxMeasurements_boilerTemp)
     {
-      Serial.printf("boilerTemp storage full, so return from here\n"); //REVIEW the old data should be renewed with the old data?
+      printf("boilerTemp_positions are full\n"); //REVIEW the old data should be renewed with the old data?
       return;
     }
-    global_sample_data[last_position_global_data].dataType = boilerTemp_dataType; //is now hardcoded boilerTemp, roomTemp not supported yet
 
-    global_sample_data[last_position_global_data].lastTime = (1611233085 + uint8_t(last_position_global_data * 60)); //this should be the local time!
+    global_sample_data[amount_filled_global_data_positions].dataType = boilerTemp_dataType; //is now hardcoded boilerTemp, roomTemp not supported yet
+
+    global_sample_data[amount_filled_global_data_positions].lastTime = (1611233085 + uint8_t(amount_filled_global_data_positions * 60)); //this should be the local time!
 
     for (uint8_t counter1 = 0; counter1 < macArrayLength; counter1++) //copy mac address
     {
-      global_sample_data[last_position_global_data].macID[counter1] = mac_addr[counter1];
+      global_sample_data[amount_filled_global_data_positions].macID[counter1] = mac_addr[counter1];
     }
 
-    global_sample_data[last_position_global_data].numberOfMeasurements = received_ESPNOW_message.numberofMeasurements;
-    global_sample_data[last_position_global_data].interval = received_ESPNOW_message.intervalTime;
-    global_sample_data[last_position_global_data].dataPosition = last_position_boilerTemp;
+    global_sample_data[amount_filled_global_data_positions].numberOfMeasurements = received_ESPNOW_message.numberofMeasurements;
+    global_sample_data[amount_filled_global_data_positions].interval = received_ESPNOW_message.intervalTime;
+    global_sample_data[amount_filled_global_data_positions].dataPosition = amount_filled_boilerTemp_positions;
 
     for (uint8_t counter1 = 0; counter1 < (received_ESPNOW_message.numberofMeasurements); counter1++)
     {
-      boilerTemp_measurement[last_position_boilerTemp].pipeTemps1[counter1] = received_ESPNOW_message.pipeTemps1[counter1];
-      boilerTemp_measurement[last_position_boilerTemp].pipeTemps2[counter1] = received_ESPNOW_message.pipeTemps2[counter1];
+      boilerTemp_measurement[amount_filled_boilerTemp_positions].pipeTemps1[counter1] = received_ESPNOW_message.pipeTemps1[counter1];
+      boilerTemp_measurement[amount_filled_boilerTemp_positions].pipeTemps2[counter1] = received_ESPNOW_message.pipeTemps2[counter1];
     }
-    if (last_position_boilerTemp < maxMeasurements_boilerTemp)
-    {
-      last_position_boilerTemp++;
-    }
-    else
-    {
-      Serial.printf("Memory of boilerTemp is currently full\n");
-    }
+    amount_filled_boilerTemp_positions++;
   }
   break;
   }
-  last_position_global_data++;
+  amount_filled_global_data_positions++;
 }
 
 void setup()
@@ -219,50 +224,61 @@ void setup()
   printf("ESPnowconfig enabled return: %d\n", ESPnowconfig(true));
 }
 
-uint8_t tempSave_last_position_global_data = 0;
+uint8_t tempSave_amount_filled_global_data_positions = 0;
+uint64_t lastSendTime = 0, last_smartMeter_contact = 0;
+
 void loop()
 {
-  if (last_position_global_data != tempSave_last_position_global_data)
+  if (amount_filled_global_data_positions != tempSave_amount_filled_global_data_positions)
   {
-    tempSave_last_position_global_data = last_position_global_data;
-    Serial.printf("last_position_global_data: %u\n", last_position_global_data);
-    Serial.printf("last_position_smartMeter: %u\n", last_position_smartMeter);
-    Serial.printf("last_position_boilerTemp: %u\n", last_position_boilerTemp);
-    Serial.printf("last_position_roomTemp: %u\n", last_position_roomTemp);
+    tempSave_amount_filled_global_data_positions = amount_filled_global_data_positions;
+    Serial.printf("amount_filled_global_data_positions: %u\n", amount_filled_global_data_positions);
+    Serial.printf("amount_filled_smartMeter_positions: %u\n", amount_filled_smartMeter_positions);
+    Serial.printf("amount_filled_boilerTemp_positions: %u\n", amount_filled_boilerTemp_positions);
+    Serial.printf("amount_filled_roomTemp_positions: %u\n", amount_filled_roomTemp_positions);
   }
-  if (last_position_global_data != 0) //there is data to send, so do this
+#define start_send_from_global_data_positions 5 //filled global data positions should be this value before send action will start
+#define start_send_with_interval_time 10        //in seconds,
+#define smartMeter_get_interval_time 5          //in seconds
+#define enableSmartmeter 1
+
+  if ((millis() - last_smartMeter_contact) > (smartMeter_get_interval_time * 1000) && enableSmartmeter)
+  {
+    printf("Doing a smartMeter measurment now\n");
+
+    // Serial.println();
+    // memset(telegram, 0, sizeof(telegram)); // Empty telegram
+    // int maxRead = 0;
+    // getData(maxRead);
+
+    //config Serial port
+    //get data en put in data storage
+    last_smartMeter_contact = millis();
+  }
+  else if ((amount_filled_global_data_positions >= start_send_from_global_data_positions) && ((millis() - lastSendTime) > (start_send_with_interval_time * 1000))) //there is data to send, so do this
   {
     ESPnowconfig(false);
     if (WiFiconfig(true))
     {
-      while (last_position_global_data > 0 && sender())
+      while (amount_filled_global_data_positions > 0 && sender())
       {
-        Serial.printf("Sending thing now, last_position_global_data: %u\n", last_position_global_data);
+        Serial.printf("Sending thing now, amount_filled_global_data_positions: %u\n", amount_filled_global_data_positions);
       }
       WiFiconfig(false);
       ESPnowconfig(true);
     }
     else
     {
-      Serial.printf("No connection\n");
+      Serial.printf("WiFiconfig fail\n");
       delay(1000);
-    }
-  }
-  // Serial.println();
-  // memset(telegram, 0, sizeof(telegram)); // Empty telegram
-  // int maxRead = 0;
-  // getData(maxRead);
 
-  // // for (byte sendMode = smartMeter_send_mode; sendMode <= boilerTemp_send_mode; sendMode++) //this is used for testing all send modes
-  // // {
-  // //   sender(sendMode);
-  // //   delay(8000);
-  // // }
-  // sender(smartMeter_send_mode);
-  // delay(3000);
+      WiFiconfig(false);
+      ESPnowconfig(true);
+    }
+    lastSendTime = millis();
+  }
 }
 
-#define WiFiconfig_debug_messages 1
 boolean WiFiconfig(boolean requestedState)
 {
   if (requestedState)
@@ -286,7 +302,7 @@ boolean WiFiconfig(boolean requestedState)
 #if WiFiconfig_debug_messages
       Serial.print(".");
 #endif
-      delay(500);
+      delay(50);
     }
 #if WiFiconfig_debug_messages
     Serial.println("\nConnected to WiFi");
@@ -296,7 +312,7 @@ boolean WiFiconfig(boolean requestedState)
   else
   {
     WiFi.mode(WIFI_OFF);
-    printf("WiFi.getMode: %d", WiFi.getMode());
+    printf("WiFi.getMode: %d\n", WiFi.getMode());
     if (WiFi.getMode() == WIFI_MODE_NULL)
     {
       return true;
@@ -684,68 +700,60 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len)
   return crc;
 }
 
-#define return_parse_data_into_json_error 0
-#define return_parse_data_into_json_smartMeterData 1
-#define return_parse_data_into_json_roomTempData 2
-#define return_parse_data_into_json_boilerTempData 3
-
 boolean sender()
 {
-  uint8_t answerFromThis = parse_data_into_json(&last_position_global_data);
-  Serial.printf("answerFromThis= %u\n", answerFromThis);
+  uint8_t position_to_send = (amount_filled_global_data_positions - 1); //select last measurement made
+  uint8_t answerFromThis = parse_data_into_json(&position_to_send);
   switch (answerFromThis)
   {
   case return_parse_data_into_json_error:
-  {
+
     printf("error in parser\n");
     return false;
-  }
-  break;
+    break;
+
   case return_parse_data_into_json_smartMeterData:
-  {
+
     printf("Send smartMeterData\n");
     if (makePostRequest2(smartMeter_send_mode))
     {
-      last_position_global_data--;
-      last_position_smartMeter--;
+      amount_filled_global_data_positions--;
+      amount_filled_smartMeter_positions--;
       return true;
     }
     else
     {
       printf("Fault smartMeterData\n");
     }
-  }
-  break;
+    break;
+
   case return_parse_data_into_json_roomTempData:
-  {
-    printf("Send smartMeterData\n");
+    printf("Send roomTempData\n");
     if (makePostRequest2(roomTemp_send_mode))
     {
-      last_position_global_data--;
-      last_position_roomTemp--;
+      amount_filled_global_data_positions--;
+      amount_filled_roomTemp_positions--;
       return true;
     }
     else
     {
-      printf("Fault smartMeterData\n");
+      printf("Fault roomTempData\n");
     }
-  }
-  break;
+    break;
+
   case return_parse_data_into_json_boilerTempData:
-  {
-    printf("Send smartMeterData\n");
+    printf("Send boilerTempData\n");
     if (makePostRequest2(boilerTemp_send_mode))
     {
-      last_position_global_data--;
-      last_position_boilerTemp--;
+      amount_filled_global_data_positions--;
+      amount_filled_boilerTemp_positions--;
       return true;
     }
     else
     {
-      printf("Fault smartMeterData\n");
+      printf("Fault boilerTempData\n");
     }
-  }
-  break;
+    break;
   }
   return false;
 }
@@ -766,7 +774,7 @@ uint8_t parse_data_into_json(uint8_t *selectedPosition)
   dataSpec["total"] = global_sample_data[*selectedPosition].numberOfMeasurements;
 
   JsonObject data = parsedJsonDoc.createNestedObject("data");
-  printf("global_sample_data[*selectedPosition].dataType = %u\n", global_sample_data[*selectedPosition].dataType);
+
   switch (global_sample_data[*selectedPosition].dataType)
   {
 

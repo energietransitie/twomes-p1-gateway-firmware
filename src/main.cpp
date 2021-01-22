@@ -131,7 +131,6 @@ bool crcCheck(int, int);
 unsigned int CRC16(unsigned int, unsigned char *, int);
 boolean sender();
 String convertToString(char[]);
-void makePostRequest();
 boolean makePostRequest2(uint8_t);
 uint8_t parse_data_into_json(uint8_t *selectedPosition);
 void interruptButton();

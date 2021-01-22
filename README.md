@@ -1,4 +1,4 @@
-# P1 Poort logger
+# P1 Poort logger/ gateway
 Firmware for ESP32 to read and parse data from Smart meter, receive data from other measurement devices trough ESPNOW, and send all this data to the backoffice trough HTTPS POST
 
 ## TODO's and considerations

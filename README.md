@@ -4,13 +4,28 @@ Firmware for ESP32 to read and parse data from Smart meter, receive data from ot
 ## TODO's and considerations
 * ~~Parse P1 data~~
 * ~~Use HTTP request to send data to backoffice~~
-* Implement ESPNOW for monitor communication
+* ~~Implement ESPNOW for monitor communication~~
 * ~~Use https instead of http~~
-* Sync RTC clock with time from smart meter readout
 * ~~Change JSON parameters to the right format~~
+* Sync RTC clock with time from smart meter readout
 * Add provisioning to exchange the WiFi credentials and unique id trough App
-* Add button functionality
+* Add button and LED functionality
+* 
 * Remove debugging code
+
+## Dependencies
+```
+#include <Arduino.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <utils.h>
+#include <espnow_settings.h>
+#include <ArduinoJson.h>
+#include <esp_now.h>
+```
+
+## Header files for program settings
+The files utils.h.bak and espnow_setting.h.bak contain program enviroment variables. To use the simply remove .bak from the file name and fill in the correct values
 
 ## JSON formats Backoffice communication
 Smart meter
@@ -108,12 +123,4 @@ Boiler temperature monitor
     }
 }
 
-```
-
-## Dependencies
-```
-#include <Arduino.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <utils.h>
 ```

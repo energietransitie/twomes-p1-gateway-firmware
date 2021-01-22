@@ -5,6 +5,7 @@
 #include <espnow_settings.h>
 #include <ArduinoJson.h> //this is used for parsing json
 #include <esp_now.h>
+//#include <BLE.h>    //not enough flash on Adafruit Huzzah ESP32
 
 //debug Messages switching
 #define WiFiconfig_debug_messages 1
@@ -218,14 +219,16 @@ void setup()
   // Attatch interrupt to button
   // attachInterrupt(button, interruptButton, FALLING);
 
-  // // Configure P1Poort serial connection
-  // P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
+  // Configure P1Poort serial connection
+  P1Poort.begin(115200, SERIAL_8N1, dataReceivePin, -1); // Start HardwareSerial. RX, TX
   //WiFiconfig(true);
+
+  //start_BLE_server();     //not enough flash on Adafruit Huzzah ESP32
   printf("ESPnowconfig enabled return: %d\n", ESPnowconfig(true));
 }
 
-uint8_t tempSave_amount_filled_global_data_positions = 0;
-uint64_t lastSendTime = 0, last_smartMeter_contact = 0;
+uint8_t tempSave_amount_filled_global_data_positions = 0; 
+uint64_t lastSendTime = 0, last_smartMeter_contact = 0;   //to save last time 
 
 void loop()
 {

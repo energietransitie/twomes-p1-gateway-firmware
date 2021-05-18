@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name TwomesGateway-rescue)(type Legacy)(uri ${KIPRJMOD}/TwomesGateway-rescue.lib)(options "")(descr ""))
+)

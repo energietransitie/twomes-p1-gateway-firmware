@@ -48,7 +48,6 @@ This software is available under the [Apache 2.0 license](./LICENSE.md), Copyrig
 This software is a collaborative effort the following students and researchers:
 * Fredrik-Otto Lautenbag ·  [@Fredrik1997](https://github.com/Fredrik1997)
 * Gerwin Buma ·  [@GerwinBuma](https://github.com/GerwinBuma) 
-* Werner Heetebrij ·  [@Werner-Heetebrij] (https://github.com/Werner-Heetebrij)
 * Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
 * Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
 

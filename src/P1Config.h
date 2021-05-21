@@ -44,14 +44,15 @@ enum P1PORTdataTypes {
 };
 
 //Struct should be exact same as in Measurement device, measurement type is enumerated in ESPNOWdataTypes
+#pragma pack(1)
 typedef struct ESP_message {
     uint8_t measurementType;       //Type of measurement
     uint8_t numberofMeasurements;               //number of measurements
     uint16_t index;                             //Number identifying the message, only increments on receiving an ACK from Gateway
-    uint8_t intervalTime;                       //Interval between measurements, for timestamping
-    int16_t pipeTemps1[MAX_SAMPLES_ESPNOW];     //measurements of the first temperature sensor
-    int16_t pipeTemps2[MAX_SAMPLES_ESPNOW];     //measurements of the second temperature sensor
-};
+    uint16_t intervalTime;                       //Interval between measurements, for timestamping
+    uint8_t data[240];
+}ESP_message;
+
 //Struct for holding the P1 Data:
 typedef struct P1Data {
     uint8_t dsmrVersion;         // DSMR versie zonder punt
@@ -64,7 +65,7 @@ typedef struct P1Data {
     long elecCurrentDeliver;     // Huidig elektriciteit levering in Watt
     long gasUsage;               // Gasverbruik in dm3
     char timeGasMeasurement[12]; // Tijdstip waarop gas voor het laats is gemeten YY:MM:DD:HH:MM:SS
-};
+}P1Data;
 
 //Function to initialise the P1 Port UART Receiver, 115200 Baud 8N1, no flow control:
 void initP1UART() {
@@ -104,60 +105,92 @@ void initGPIO() {
 }
 
 int packageESPNowMessageJSON(struct ESP_message *message) {
-    const char JSONformat[] = "{\"upload_time\": \"%ld\",\"property_measurements\":[{\"property_name\":  \"%s\",\"timestamp\":\"%ld\", \"timestamp_type\", \"end\", \"interval\": %u, \"measurements\": [ \"%s\"]}]}";
-    long now = time(NULL); //Get current time
-
     switch (message->measurementType) {
         case BOILERTEMP:
         {
-            ESP_LOGI("JSON", "Received BOILERTEMP, containing %d measurements\n", message->numberofMeasurements);
+            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"boilerTemp1\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]},{\"property_name\":\"boilerTemp2\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            long now = time(NULL); //Get current time
+            ESP_LOGI("JSON", "Received BOILERTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
             { //Place in scope to free stack after post
-                char propertyName[] = "BoilerTemp1";
-                char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
+                char measurements[(8 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
+                char measurements2[(8 * MAX_SAMPLES_ESPNOW) + 1];
                 uint8_t i;
-                measurements[0] = 0;
+                measurements[0] = 0;    //initialise 0 on first element of array
+                measurements2[0] = 0;
+#pragma pack(1)
+                struct Boiler_message {
+                    int16_t pipeTemps1[MAX_SAMPLES_ESPNOW];
+                    int16_t pipeTemps2[MAX_SAMPLES_ESPNOW];
+                }boilerMessage;
+                memcpy(&boilerMessage, message->data, sizeof(message->data));
                 for (i = 0; i < message->numberofMeasurements; i++) {
-                    char measurementString[7];
-                    sprintf(measurementString, "%2.2f,", ((float)((message->pipeTemps1[i]) * 0.0078125f)));
+                    char measurementString[9];
+                    sprintf(measurementString, "\"%2.2f\",", ((float)((boilerMessage.pipeTemps1[i]) * 0.0078125f)));
                     strcat(measurements, measurementString);
+                    sprintf(measurementString, "\"%2.2f\",", ((float)((boilerMessage.pipeTemps2[i]) * 0.0078125f)));
+                    strcat(measurements2, measurementString);
                 }//for(i<numberofMeasurements)
-                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING! should this be on stack instead, with HTTPS post inside this function?
-                sprintf(stringifiedMessage, JSONformat, now, propertyName, now, message->intervalTime, measurements);
+                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING!
+                sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements, now, message->intervalTime, measurements2);
+                //HTTPS_post(stringifiedmessage);               //not yet working
                 ESP_LOGI("JSON", "%s\n", stringifiedMessage);
                 free(stringifiedMessage);
-            }//post boiler temp 1
-            //Post boilertemp 2:
-            {
-                char propertyName[] = "BoilerTemp2";
-                char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
-                measurements[0] = 0;
-                uint8_t i;
-                for (i = 0; i < message->numberofMeasurements; i++) {
-                    char measurementString[7];
-                    sprintf(measurementString, "%2.2f,", ((float)((message->pipeTemps2[i]) * 0.0078125f)));
-                    strcat(measurements, measurementString);
-                }//for(i<numberofMeasurements)
-                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING! should this be on stack instead, with HTTPS post inside this function?
-                sprintf(stringifiedMessage, JSONformat, now, propertyName, now, message->intervalTime, measurements);
-                ESP_LOGI("JSON", "%s\n", stringifiedMessage);
-                free(stringifiedMessage);
-            }//Post boilertemp 2
+            }//post boiler temp
             return 1;
             break;
         }//case BOILERTEMP
         case ROOMTEMP:
         {
-            return 1;
-            break;
+            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"RoomTemp\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            long now = time(NULL); //Get current time
+            ESP_LOGI("JSON", "Received ROOMTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
+            //Post boilertemp 1:
+            { //Place in scope to free stack after post
+                char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
+                uint8_t i;
+                measurements[0] = 0;    //initialise 0 on first element of array
+                for (i = 0; i < message->numberofMeasurements; i++) {
+                    char measurementString[9];
+                    sprintf(measurementString, "\"%2.2f\",", ((float)((message->data[i]) * 0.0078125f)));
+                    strcat(measurements, measurementString);
+                }//for(i<numberofMeasurements)
+                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING!
+                sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
+                //HTTPS_post(stringifiedmessage);               //not yet working
+                ESP_LOGI("JSON", "%s\n", stringifiedMessage);
+                free(stringifiedMessage);
+                return 1;
+                break;
+            }
         }//case ROOMTEMP
         case CO2:
         {
+            // const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"CO2concentration\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            // long now = time(NULL); //Get current time
+            // ESP_LOGI("JSON", "Received ROOMTEMP, containing %d measurements\n", message->numberofMeasurements);
+            // //Post boilertemp 1:
+            // { //Place in scope to free stack after post
+            //     char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
+            //     uint8_t i;
+            //     measurements[0] = 0;    //initialise 0 on first element of array
+            //     for (i = 0; i < message->numberofMeasurements; i++) {
+            //         char measurementString[9];
+            //         sprintf(measurementString, "\"%d\",", message->pipeTemps1[i]);
+            //         strcat(measurements, measurementString);
+            //     }//for(i<numberofMeasurements)
+            //     char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING!
+            //     sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
+            //     //HTTPS_post(stringifiedmessage);               //not yet working
+            //     ESP_LOGI("JSON", "%s\n", stringifiedMessage);
+            //     free(stringifiedMessage);
+            //     return 1;
             return 1;
             break;
         }//case CO2
         default:
         {
+            ESP_LOGI("JSON", "Received an unknown type");
             return 0;
             break;
         }//default

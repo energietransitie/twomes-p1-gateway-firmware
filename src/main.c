@@ -28,7 +28,6 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 }//gpio_isr_handler
 
-
 //function to read P1 port and store message in a buffer
 void read_P1(void *args) {
     while (1) {
@@ -199,11 +198,11 @@ void app_main(void) {
     ESP_ERROR_CHECK(esp_now_init());
     uint8_t macAddress[6];
     esp_wifi_get_mac(ESP_IF_WIFI_STA, macAddress);
-    ESP_LOGI("MAC", "\nMy MAC address is: %02X:%02X:%02X:%02X:%02X:%02X\n", macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
+    ESP_LOGI("MAC", "My MAC address is: %02X:%02X:%02X:%02X:%02X:%02X\n", macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
     esp_now_register_recv_cb(onDataReceive);
 
     //Create tasks:
-    // xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 4096, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 4096, NULL, 10, NULL, 1);
 #if DEBUG
     xTaskCreatePinnedToCore(pingAlive, "ping_alive", 2048, NULL, 10, NULL, 1);
 #endif

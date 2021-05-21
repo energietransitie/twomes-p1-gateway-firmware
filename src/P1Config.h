@@ -44,7 +44,6 @@ enum P1PORTdataTypes {
 };
 
 //Struct should be exact same as in Measurement device, measurement type is enumerated in ESPNOWdataTypes
-#pragma pack(1)
 typedef struct ESP_message {
     uint8_t measurementType;       //Type of measurement
     uint8_t numberofMeasurements;               //number of measurements
@@ -113,17 +112,16 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
             ESP_LOGI("JSON", "Received BOILERTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
             { //Place in scope to free stack after post
-                char measurements[(8 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
+                char measurements[(8 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value,  1 comma seperator and 2 apostrophes)
                 char measurements2[(8 * MAX_SAMPLES_ESPNOW) + 1];
                 uint8_t i;
-                measurements[0] = 0;    //initialise 0 on first element of array
+                measurements[0] = 0;    //initialise 0 on first element of array to indicate start of string
                 measurements2[0] = 0;
-#pragma pack(1)
                 struct Boiler_message {
                     int16_t pipeTemps1[MAX_SAMPLES_ESPNOW];
                     int16_t pipeTemps2[MAX_SAMPLES_ESPNOW];
                 }boilerMessage;
-                memcpy(&boilerMessage, message->data, sizeof(message->data));
+                memcpy(&boilerMessage, message->data, sizeof(message->data)); //copy data from uint8_t[240] to datatype of measurement. Could this be typecast instead of copy?
                 for (i = 0; i < message->numberofMeasurements; i++) {
                     char measurementString[9];
                     sprintf(measurementString, "\"%2.2f\",", ((float)((boilerMessage.pipeTemps1[i]) * 0.0078125f)));
@@ -131,9 +129,9 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
                     sprintf(measurementString, "\"%2.2f\",", ((float)((boilerMessage.pipeTemps2[i]) * 0.0078125f)));
                     strcat(measurements2, measurementString);
                 }//for(i<numberofMeasurements)
-                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING!
+                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function?
                 sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements, now, message->intervalTime, measurements2);
-                //HTTPS_post(stringifiedmessage);               //not yet working
+                //HTTPS_post(stringifiedmessage);
                 ESP_LOGI("JSON", "%s\n", stringifiedMessage);
                 free(stringifiedMessage);
             }//post boiler temp
@@ -142,20 +140,23 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
         }//case BOILERTEMP
         case ROOMTEMP:
         {
-            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"RoomTemp\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"roomTemp\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
             long now = time(NULL); //Get current time
             ESP_LOGI("JSON", "Received ROOMTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
             { //Place in scope to free stack after post
-                char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
+                char measurements[(8 * MAX_SAMPLES_ESPNOW) + 1];  //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
                 uint8_t i;
-                measurements[0] = 0;    //initialise 0 on first element of array
+                measurements[0] = 0;    //initialise 0 on first element of array to indicate start of string
+                uint16_t roomTemps[120];
+                memcpy(roomTemps, message->data, sizeof(message->data)); //copy data from uint8_t[240] to datatype of measurement. Could this be typecast instead of copy?
                 for (i = 0; i < message->numberofMeasurements; i++) {
                     char measurementString[9];
-                    sprintf(measurementString, "\"%2.2f\",", ((float)((message->data[i]) * 0.0078125f)));
+                    //Currently using conversion of DS18B20 RAW temperature! (No SI7051 support yet!)
+                    sprintf(measurementString, "\"%2.2f\",", ((float)((roomTemps[i]) * 0.0078125f)));
                     strcat(measurements, measurementString);
                 }//for(i<numberofMeasurements)
-                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING!
+                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function?
                 sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
                 //HTTPS_post(stringifiedmessage);               //not yet working
                 ESP_LOGI("JSON", "%s\n", stringifiedMessage);
@@ -166,25 +167,24 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
         }//case ROOMTEMP
         case CO2:
         {
-            // const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"CO2concentration\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
-            // long now = time(NULL); //Get current time
-            // ESP_LOGI("JSON", "Received ROOMTEMP, containing %d measurements\n", message->numberofMeasurements);
-            // //Post boilertemp 1:
-            // { //Place in scope to free stack after post
-            //     char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Print every temperature as "25.72,34.68,..." resulting in 6 chars for every measurements (4 numbers, a '.' and a ',');
-            //     uint8_t i;
-            //     measurements[0] = 0;    //initialise 0 on first element of array
-            //     for (i = 0; i < message->numberofMeasurements; i++) {
-            //         char measurementString[9];
-            //         sprintf(measurementString, "\"%d\",", message->pipeTemps1[i]);
-            //         strcat(measurements, measurementString);
-            //     }//for(i<numberofMeasurements)
-            //     char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //DO NOT FORGET TO FREE AFTER SENDING!
-            //     sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
-            //     //HTTPS_post(stringifiedmessage);               //not yet working
-            //     ESP_LOGI("JSON", "%s\n", stringifiedMessage);
-            //     free(stringifiedMessage);
-            //     return 1;
+            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"CO2concentration\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            long now = time(NULL); //Get current time
+            ESP_LOGI("JSON", "Received ROOMTEMP, containing %d measurements\n", message->numberofMeasurements);
+            char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
+            measurements[0] = 0;    //initialise 0 on first element of array to indicate start of string
+            uint16_t co2ppm[120];
+            memcpy(co2ppm, message->data, sizeof(message->data));   //copy data from uint8_t[240] to datatype of measurement.  Could this be typecast instead of copy?
+            uint8_t i;
+            for (i = 0; i < message->numberofMeasurements; i++) {
+                char measurementString[9];
+                sprintf(measurementString, "\"%d\",", co2ppm[i]);
+                strcat(measurements, measurementString);
+            }//for(i<numberofMeasurements)
+            char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function?
+            sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
+            //HTTPS_post(stringifiedmessage);               //not yet working
+            ESP_LOGI("JSON", "%s\n", stringifiedMessage);
+            free(stringifiedMessage);
             return 1;
             break;
         }//case CO2

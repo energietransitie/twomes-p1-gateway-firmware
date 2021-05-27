@@ -3,6 +3,34 @@
 
 static const char *TAGP1 = "P1-Config";
 
+char *bearer;
+const char *rootCAR3 = "-----BEGIN CERTIFICATE-----\n" \
+"MIIEZTCCA02gAwIBAgIQQAF1BIMUpMghjISpDBbN3zANBgkqhkiG9w0BAQsFADA/\n" \
+"MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT\n" \
+"DkRTVCBSb290IENBIFgzMB4XDTIwMTAwNzE5MjE0MFoXDTIxMDkyOTE5MjE0MFow\n" \
+"MjELMAkGA1UEBhMCVVMxFjAUBgNVBAoTDUxldCdzIEVuY3J5cHQxCzAJBgNVBAMT\n" \
+"AlIzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuwIVKMz2oJTTDxLs\n" \
+"jVWSw/iC8ZmmekKIp10mqrUrucVMsa+Oa/l1yKPXD0eUFFU1V4yeqKI5GfWCPEKp\n" \
+"Tm71O8Mu243AsFzzWTjn7c9p8FoLG77AlCQlh/o3cbMT5xys4Zvv2+Q7RVJFlqnB\n" \
+"U840yFLuta7tj95gcOKlVKu2bQ6XpUA0ayvTvGbrZjR8+muLj1cpmfgwF126cm/7\n" \
+"gcWt0oZYPRfH5wm78Sv3htzB2nFd1EbjzK0lwYi8YGd1ZrPxGPeiXOZT/zqItkel\n" \
+"/xMY6pgJdz+dU/nPAeX1pnAXFK9jpP+Zs5Od3FOnBv5IhR2haa4ldbsTzFID9e1R\n" \
+"oYvbFQIDAQABo4IBaDCCAWQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8E\n" \
+"BAMCAYYwSwYIKwYBBQUHAQEEPzA9MDsGCCsGAQUFBzAChi9odHRwOi8vYXBwcy5p\n" \
+"ZGVudHJ1c3QuY29tL3Jvb3RzL2RzdHJvb3RjYXgzLnA3YzAfBgNVHSMEGDAWgBTE\n" \
+"p7Gkeyxx+tvhS5B1/8QVYIWJEDBUBgNVHSAETTBLMAgGBmeBDAECATA/BgsrBgEE\n" \
+"AYLfEwEBATAwMC4GCCsGAQUFBwIBFiJodHRwOi8vY3BzLnJvb3QteDEubGV0c2Vu\n" \
+"Y3J5cHQub3JnMDwGA1UdHwQ1MDMwMaAvoC2GK2h0dHA6Ly9jcmwuaWRlbnRydXN0\n" \
+"LmNvbS9EU1RST09UQ0FYM0NSTC5jcmwwHQYDVR0OBBYEFBQusxe3WFbLrlAJQOYf\n" \
+"r52LFMLGMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjANBgkqhkiG9w0B\n" \
+"AQsFAAOCAQEA2UzgyfWEiDcx27sT4rP8i2tiEmxYt0l+PAK3qB8oYevO4C5z70kH\n" \
+"ejWEHx2taPDY/laBL21/WKZuNTYQHHPD5b1tXgHXbnL7KqC401dk5VvCadTQsvd8\n" \
+"S8MXjohyc9z9/G2948kLjmE6Flh9dDYrVYA9x2O+hEPGOaEOa1eePynBgPayvUfL\n" \
+"qjBstzLhWVQLGAkXXmNs+5ZnPBxzDJOLxhF2JIbeQAcH5H0tZrUlo5ZYyOqA7s9p\n" \
+"O5b85o3AM/OJ+CktFBQtfvBhcJVd9wvlwPsk+uyOy2HI7mNxKKgsBTt375teA2Tw\n" \
+"UdHkhVNcsAKX1H7GNNLOEADksd86wuoXvg==\n" \
+"-----END CERTIFICATE-----\n";
+
 //UART defines
 #define P1_BUFFER_SIZE 1024
 #define P1PORT_UART_NUM UART_NUM_2
@@ -103,11 +131,30 @@ void initGPIO() {
     gpio_config(&io_conf);
 }
 
-int packageESPNowMessageJSON(struct ESP_message *message) {
+/**
+ * @brief Package ESP-Now message into Twomes JSON format
+ *
+ * @param ESP_message data
+ *
+ * @return pointer to JSON string on heap (NEEDS TO BE FREED)
+ */
+char *packageESPNowMessageJSON(struct ESP_message *message) {
     switch (message->measurementType) {
         case BOILERTEMP:
         {
-            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"boilerTemp1\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]},{\"property_name\":\"boilerTemp2\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            const char JSONformat[] =
+                "\"property_measurements\":"
+                "[{\"property_name\":\"boilerTemp1\"," //BoilerTemp1
+                "\"timestamp\":\"%ld\","
+                "\"timestamp_type\":\"end\","
+                "\"interval\":%u,"
+                "\"measurements\":[%s]},"
+
+                "{\"property_name\":\"boilerTemp2\"," //BoilerTemp2
+                "\"timestamp\":\"%ld\","
+                "\"timestamp_type\":\"end\","
+                "\"interval\":%u,\""
+                "measurements\":[%s]}]}";
             long now = time(NULL); //Get current time
             ESP_LOGI("JSON", "Received BOILERTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
@@ -129,18 +176,22 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
                     sprintf(measurementString, "\"%2.2f\",", ((float)((boilerMessage.pipeTemps2[i]) * 0.0078125f)));
                     strcat(measurements2, measurementString);
                 }//for(i<numberofMeasurements)
-                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function?
-                sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements, now, message->intervalTime, measurements2);
+                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function? (should then remove upload time insertion here...)
+                sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurements, now, message->intervalTime, measurements2);
                 //HTTPS_post(stringifiedmessage);
                 ESP_LOGI("JSON", "%s\n", stringifiedMessage);
-                free(stringifiedMessage);
+                return stringifiedMessage;
             }//post boiler temp
-            return 1;
             break;
         }//case BOILERTEMP
         case ROOMTEMP:
         {
-            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"roomTemp\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            const char JSONformat[] = "\"property_measurements\":"
+                "[{\"property_name\":\"roomTemp\","
+                "\"timestamp\":\"%ld\","
+                "\"timestamp_type\":\"end\","
+                "\"interval\":%u,"
+                "\"measurements\":[%s]}]}";
             long now = time(NULL); //Get current time
             ESP_LOGI("JSON", "Received ROOMTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
@@ -156,18 +207,21 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
                     sprintf(measurementString, "\"%2.2f\",", ((float)((roomTemps[i]) * 0.0078125f)));
                     strcat(measurements, measurementString);
                 }//for(i<numberofMeasurements)
-                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function?
-                sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
-                //HTTPS_post(stringifiedmessage);               //not yet working
+                char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function? (should then remove upload time insertion here...)
+                sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurements);
                 ESP_LOGI("JSON", "%s\n", stringifiedMessage);
-                free(stringifiedMessage);
-                return 1;
+                return stringifiedMessage;
                 break;
             }
         }//case ROOMTEMP
         case CO2:
         {
-            const char JSONformat[] = "{\"upload_time\":\"%ld\",\"property_measurements\":[{\"property_name\":\"CO2concentration\",\"timestamp\":\"%ld\",\"timestamp_type\":\"end\",\"interval\":%u,\"measurements\":[%s]}]}";
+            const char JSONformat[] = "\"property_measurements\":"
+                "[{\"property_name\":\"CO2concentration\","
+                "\"timestamp\":\"%ld\","
+                "\"timestamp_type\":\"end\","
+                "\"interval\":%u,"
+                "\"measurements\":[%s]}]}";
             long now = time(NULL); //Get current time
             ESP_LOGI("JSON", "Received ROOMTEMP, containing %d measurements\n", message->numberofMeasurements);
             char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
@@ -180,12 +234,11 @@ int packageESPNowMessageJSON(struct ESP_message *message) {
                 sprintf(measurementString, "\"%d\",", co2ppm[i]);
                 strcat(measurements, measurementString);
             }//for(i<numberofMeasurements)
-            char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function?
-            sprintf(stringifiedMessage, JSONformat, now, now, message->intervalTime, measurements);
+            char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function? (should then remove upload time insertion here...)
+            sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurements);
             //HTTPS_post(stringifiedmessage);               //not yet working
             ESP_LOGI("JSON", "%s\n", stringifiedMessage);
-            free(stringifiedMessage);
-            return 1;
+            return stringifiedMessage;
             break;
         }//case CO2
         default:

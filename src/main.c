@@ -1,3 +1,4 @@
+
 //Generic Twomes Firmware
 #include <generic_esp_32.h>
 #include <P1Config.h>
@@ -9,8 +10,7 @@
 #include <driver/gpio.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
-
-// #define DEBUG 1
+#include <wifi_provisioning/manager.h>
 
 #define P1_READ_INTERVAL 10000 //Interval to read P1 data in milliseconds
 
@@ -55,11 +55,10 @@ void pingAlive(void *args) {
     }
 }//void pingAlive
 #endif
-
-/**Blink LEDs to test GPIO:
- * Pass two arguments in uint8_t array:
- * argument[0] = amount of blinks
- * argument[1] = pin to blink on (LED_STATUS or LED_ERROR)
+/**Blink LEDs to test GPIO
+ * @param args Pass two arguments in uint8_t array
+ * @param argument[0] amount of blinks
+ * @param argument[1] pin to blink on (LED_STATUS or LED_ERROR)
  */
 void blink(void *args) {
     uint8_t *arguments = (uint8_t *)args;
@@ -76,6 +75,8 @@ void blink(void *args) {
     vTaskDelete(NULL);
 }//void blink;
 
+
+
 /**
  * Check for input of buttons and the duration
  * if the press duration was more than 5 seconds, erase the flash memory to restart provisioning
@@ -85,20 +86,21 @@ void buttonPressDuration(void *args) {
     uint32_t io_num;
     while (1) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            uint8_t seconds = 0;
+            uint8_t halfSeconds = 0;
             while (!gpio_get_level(BUTTON_P2)) {
                 vTaskDelay(500 / portTICK_PERIOD_MS);
-                seconds++;
-                if (seconds == 9) {
-                    ESP_LOGI("ISR", "Button held for over 5 seconds\n");
+                halfSeconds++;
+                if (halfSeconds == 19) {
+                    ESP_LOGI("ISR", "Button held for over 10 seconds\n");
                     char blinkArgs[2] = { 5, LED_ERROR };
                     xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
                     //Long press on P2 is for full Reset, clearing provisioning memory:
-                    nvs_flash_erase();
+                    //TODO: replace with Provisioning Reset only (NO FLASHERASE!!!)
+                    esp_wifi_restore();
                     vTaskDelay(1000 / portTICK_PERIOD_MS); //Wait for blink to finish
                     esp_restart();  //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change) 
                     break; //Exit loop
-                }//if (seconds == 9)
+                }//if (halfSeconds == 9)
                 //If the button gets released before 5 seconds have passed:
                 else if (gpio_get_level(BUTTON_P2)) {
                     char blinkArgs[2] = { 5, LED_STATUS };
@@ -114,44 +116,13 @@ void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length
     uint8_t espnowBlinks[2] = { 2, LED_STATUS }; //Blink status LED twice on receive:
     xTaskCreatePinnedToCore(blink, "blinkESPNOW", 786, espnowBlinks, 1, NULL, 1);
     ESP_LOGI(TAG, "RECEIVED ESP_NOW MESSAGE");
-
     struct ESP_message ESPNowData;
     memcpy(&ESPNowData, payload, length);
-    int result = packageESPNowMessageJSON(&ESPNowData);
+    char *result = packageESPNowMessageJSON(&ESPNowData);
     // ESP_LOGI("ESPNOW", "%s", JSONMessage);
 }
 
 void app_main(void) {
-#if EXAMPLE
-    initialize_nvs();
-    initialize();
-    /* Initialize TCP/IP */
-    ESP_ERROR_CHECK(esp_netif_init());
-
-    wifi_prov_mgr_config_t config = initialize_provisioning();
-    //Starts provisioning if not provisioned, otherwise skips provisioning.
-    start_provisioning(config);
-    //Initialize time with timezone Europe and city Amsterdam
-    initialize_time("CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00");
-    //URL Do not forget to use https:// when using the https() function.
-    char *url = "https://192.168.178.75:4444/set/house/opentherm";
-
-    //Gets time as epoch time.
-    int now = time(NULL);
-
-    //Creates data string replacing %d with the time integer.
-    char *dataPlain = "{\"deviceMac\":\"8C:AA:B5:85:A2:3D\",\"measurements\": [{\"property\":\"testy\",\"value\":\"hello_world\"}],\"time\":%d}";
-    char data[strlen(dataPlain)];
-    sprintf(data, dataPlain, now);
-
-    /* Start main application now */
-    while (1) {
-        //Logs hello world and tries to post with https every 10 seconds. Replace post_https(url, data, cert) with post_http(url,data) to use plain http over TCP
-        ESP_LOGI(TAG, "Hello World!");
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
-        post_https(url, data, NULL);
-    }
-#endif
     //INIT NVS and GPIO:
     initialize_nvs();
     initialize();
@@ -168,10 +139,50 @@ void app_main(void) {
     /* Initialize TCP/IP */
     ESP_ERROR_CHECK(esp_netif_init());
 
-    //Start Provisioning:
+    uint32_t pop;
+    nvs_handle_t pop_handle;
+    esp_err_t err = nvs_open("twomes_storage", NVS_READWRITE, &pop_handle);
+    if (err) {
+        ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+    }
+    else {
+        ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
+        err = nvs_get_u32(pop_handle, "pop", &pop);
+        switch (err) {
+            case ESP_OK:
+                ESP_LOGI(TAG, "The PoP has been initialized already!\n");
+                ESP_LOGI(TAG, "The PoP is: %d\n", pop);
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                ESP_LOGI(TAG, "The PoP is not initialized yet!");
+                ESP_LOGI(TAG, "Creating PoP");
+                pop = esp_random();
+                ESP_LOGI(TAG, "Attempting to store PoP: %d", pop);
+                err = nvs_set_u32(pop_handle, "pop", pop);
+                if (!err) {
+                    ESP_LOGI(TAG, "Succesfully wrote PoP: %d to NVS twomes_storage", pop);
+                }
+                else {
+                    ESP_LOGE(TAG, "Failed to write PoP to NVS twomes_storage: %s", esp_err_to_name(err));
+                }
+                break;
+            default:
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+        }
+    }
+    ESP_LOGI(TAG, "POP: %u", pop);
+
+    int msgSize = variable_sprintf_size("%d", 1, pop);
+    //Allocating enough memory so inputting the variables into the string doesn't overflow
+    char *popStr = malloc(msgSize);
+    //Inputting variables into the plain json string from above(msgPlain).
+    snprintf(popStr, msgSize, "%d", pop);
+
     wifi_prov_mgr_config_t config = initialize_provisioning();
     //Starts provisioning if not provisioned, otherwise skips provisioning.
-    start_provisioning(config);
+    //If set to false it will not autoconnect after provisioning.
+    //If set to true it will autonnect.
+    start_provisioning(config, popStr, "Generic-Test", true);
     //Initialize time with timezone Europe and city Amsterdam
     initialize_time("CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00");
     //URL Do not forget to use https:// when using the https() function.
@@ -207,3 +218,4 @@ void app_main(void) {
     xTaskCreatePinnedToCore(pingAlive, "ping_alive", 2048, NULL, 10, NULL, 1);
 #endif
 }
+//pop -147346788

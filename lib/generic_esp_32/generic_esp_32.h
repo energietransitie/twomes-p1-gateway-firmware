@@ -1,9 +1,6 @@
 #ifndef _GENERIC_ESP_32_H
 #define _GENERIC_ESP_32_H
 
-#define NO_APP
-#define DEFINE_OAUTH_TOKEN "ajdaskjdfhaksjdfhaoisdcfnaklf"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +36,8 @@
 void sntp_sync_time(struct timeval *tv);
 #endif
 
+char* get_types(char* stringf, int count);
+int variable_sprintf_size(char* string, int count, ...);
 void initialize();
 void time_sync_notification_cb(struct timeval *tv);
 void prov_event_handler(void *arg, esp_event_base_t event_base,int32_t event_id, void *event_data);
@@ -50,12 +49,16 @@ esp_err_t custom_prov_data_handler(uint32_t session_id, const uint8_t *inbuf, ss
 void initialize_sntp(void);
 void obtain_time(void);
 void initialize_time(char* timezone);
-void post_http(char* url, char *data);
-void post_https(char* url, char *data, char* cert);
+void post_http(char* url, char *data, char* authenticationToken);
+char* post_https(char* url, char *data, char* cert, char* authenticationToken);
+char* get_bearer();
+void activate_device(char* url, uint32_t pop, char* cert);
+void get_http(char* url);
 
 void initialize_nvs();
 
 wifi_prov_mgr_config_t initialize_provisioning();
-void start_provisioning(wifi_prov_mgr_config_t config);
-
+void start_provisioning(wifi_prov_mgr_config_t config, char* pop, char* device_name, bool connect);
+void disable_wifi();
+void enable_wifi();
 #endif

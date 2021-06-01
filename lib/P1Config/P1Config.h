@@ -63,16 +63,14 @@ typedef struct ESP_message
 //Struct for holding the P1 Data:
 typedef struct P1Data
 {
-    uint8_t dsmrVersion;         // DSMR versie zonder punt
-    double elecUsedT1;           // Elektriciteit verbruikt tarief 1 in kWh
-    double elecUsedT2;           // Elektriciteit verbruikt tarief 2 in kWh
-    double elecDeliveredT1;      // Elektriciteit geleverd tarief 1 in kWh
-    double elecDeliveredT2;      // Elektriciteit geleverd tarief 2 in kWh
-    uint8_t currentTarrif;       // Huidig tafief
-    double elecCurrentUsage;     // Huidig elektriciteitsverbruik In Watt
-    double elecCurrentDeliver;   // Huidig elektriciteit levering in Watt
+    uint8_t dsmrVersion;         // DSMR version without decimal point
+    double elecUsedT1;           // Electrical Energy used Tariff 1 in kWh
+    double elecUsedT2;           // Electrical Energy used Tariff 2 in kWh
+    double elecDeliveredT1;      // Electrical Delivered used Tariff 1 in kWh
+    double elecDeliveredT2;      // Electrical Delivered used Tariff 2 in kWh
+    char timeElecMeasurement[14]; //Timestamp for most recent Electricity measurement
     double gasUsage;             // Gasverbruik in dm3
-    char timeGasMeasurement[14]; // Tijdstip waarop gas voor het laats is gemeten YY:MM:DD:HH:MM:SS
+    char timeGasMeasurement[14]; // Timestamp for most recent gas measurement YY:MM:DD:HH:MM:SS And S/W for summer or winter time
 } P1Data;
 //Error types for P1 data reading:
 #define P1_READ_OK 0
@@ -82,6 +80,7 @@ typedef struct P1Data
 #define P1_ERROR_ELECRETURNT1_NOT_FOUND 4
 #define P1_ERROR_ELECRETURNT2_NOT_FOUND 5
 #define P1_ERROR_GAS_READING_NOT_FOUND 6
+#define P1_ERROR_ELEC_TIMESTAMP_NOT_FOUND 7
 
 /**
  *  ========== FUNCTIONS ================

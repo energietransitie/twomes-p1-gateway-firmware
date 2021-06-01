@@ -228,6 +228,7 @@ void pingHeap(void *args)
     }
 } //void pingAlive
 #endif
+
 /**Blink LEDs to test GPIO
  * @param args Pass two arguments in uint8_t array
  * @param argument[0] amount of blinks

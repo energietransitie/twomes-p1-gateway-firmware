@@ -164,9 +164,52 @@ char *packageESPNowMessageJSON(ESP_message *message)
     } //switch messagetype
 }
 
-// char *packageP1portJSON(P1Data data, int length) {
-
-// }
+char *packageP1portJSON(P1Data *data) {
+    //Get current time:
+    unsigned int now = time(NULL);
+    char* JSONformat = 
+        "\"property_measurements\": ["
+            "{\"property_name\": \"eMeterReadingSupplyLow\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","   //Timestamp of P1 read
+                "\"value\": \"%lf\"}"       //Double
+            "]},"
+            "{\"property_name\": \"eMeterReadingSupplyHigh\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","
+                "\"value\": \"%lf\"}"
+            "]},"
+            "{\"property_name\": \"eMeterReadingReturnLow\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","
+                "\"value\": \"%lf\"}"
+            "]},"
+            "{\"property_name\": \"eMeterReadingReturnHigh\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","
+                "\"value\": \"%lf\"}"
+            "]},"
+            "{\"property_name\": \"eMeterReadingTimestamp\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","
+                "\"value\": \"%13s\"}"  //13 character string
+            "]},"
+            "{\"property_name\": \"gMeterReadingSupply\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","
+                "\"value\": \"%lf\"}"
+            "]},"
+            "{\"property_name\": \"gMeterReadingTimestamp\","
+            "\"measurements\": ["
+                "{\"timestamp\": \"%u\","
+                "\"value\": \"%13s\"}"  //13 character string
+            "]}"
+    "]}";   
+    char *P1JSONbuffer = malloc(P1_BUFFER_SIZE);
+    //print measurement data into JSON string:
+    sprintf(P1JSONbuffer, JSONformat, now, data, now, data->elecUsedT1, now, data->elecUsedT2, now, data->elecDeliveredT1, now , data->elecDeliveredT2, now, data->gasUsage, now, data->timeGasMeasurement);
+    return P1JSONbuffer; 
+}
 
 /**
  * @brief Post ESP-Now data to the backoffice (fixed interval)
@@ -269,6 +312,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct)
     else
         return P1_ERROR_ELECRETURNT2_NOT_FOUND;
 
+
     //elecReturnT2 OBIS reference 1-0:2.8.2
     char *elecReturnT2Pos = strstr(p1String, "1-0:2.8.2");
     if (elecReturnT2Pos != NULL)
@@ -277,6 +321,13 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct)
     }
     else
         return P1_ERROR_ELECRETURNT2_NOT_FOUND;
+
+    //elec Timestamp OBIS reference 
+    char *elecTimePos = strstr(p1String, "0-0:1.0.0");
+    if(elecTimePos != NULL){
+        sscanf(elecTimePos, "0-0:1.0.0(%13s", p1Struct->timeElecMeasurement);
+        p1Struct->timeElecMeasurement[13] = 0; //add a zero terminator at the end to read as string
+    }
 
     //Gas reading OBIS: 0-n:24.2.1 //n can vary depending on which channel it is installed
     char *gasPos = strstr(p1String, "0-1:24.2.1");
@@ -305,6 +356,7 @@ void printP1Data(P1Data *data)
     ESP_LOGI("P1 Print", "ELEC USED T2: %4.3f ", data->elecUsedT2);
     ESP_LOGI("P1 Print", "ELEC RETURNED T1: %4.3f ", data->elecDeliveredT1);
     ESP_LOGI("P1 Print", "ELEC RETURNED T2: %4.3f ", data->elecDeliveredT2);
+    ESP_LOGI("P1 Print", "ELEC TIMESTAMP: %s", data->timeElecMeasurement);
     ESP_LOGI("P1 Print", "GAS USED:  %7.3f ", data->gasUsage);
     ESP_LOGI("P1 Print", "GAS TIMESTAMP: %s ", data->timeGasMeasurement);
 }
@@ -336,6 +388,9 @@ void printP1Error(int errorType)
         break;
     case P1_ERROR_GAS_READING_NOT_FOUND:
         ESP_LOGI("P1_ERROR", "Gas reading not found");
+        break;
+    case P1_ERROR_ELEC_TIMESTAMP_NOT_FOUND:
+        ESP_LOGI("P1_ERROR", "Electricity timestamp not found");
         break;
     default:
         break;

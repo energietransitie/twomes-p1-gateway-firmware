@@ -26,14 +26,15 @@ List of features ready and TODOs for future development.
 Ready:
 * Receive ESP-Now data from sensors
 * Package received data into JSON
-* Receive Network Credentials through SoftAP unified provisioning
+* Receive Network Credentials through BLE unified provisioning
 * indicate status and error through LEDs
 * Receive user input through buttons
-* Reset provisioning when P2 (GPIO 12) is held for over 5 seconds
+* Reset provisioning when P2 (GPIO 12) is held for over 10 seconds
+* Read P1 port and package into struct
 
 To-do:
 * Implement Channel and MAC provisioning to sensor nodes
-* Implement P1 reading and packaging
+* Package P1 read data into JSON
 * HTTPS post to backoffice
 
 ## Status

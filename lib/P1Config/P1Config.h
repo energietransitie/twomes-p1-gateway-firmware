@@ -14,7 +14,7 @@
 #include <driver/uart.h>
 #include <driver/gpio.h>
 
-
+#define VERSION "V1.0"
 
 //UART defines
 #define P1_BUFFER_SIZE 1024
@@ -30,7 +30,7 @@
 #define ACTIVATE_ADDRESS "/device/activate"
 #define FIXED_INTERVAL_ADDRESS "/device/measurements/fixed-interval"
 #define VARIABLE_INTERVAL_ADDRESS "/device/measurements/variable-interval"
-#define JSON_BUFFER_SIZE 4096
+#define JSON_BUFFER_SIZE 2048
 
 //Pin definitions:
 #define BUTTON_P1 GPIO_NUM_0
@@ -43,16 +43,14 @@
 
 #define MAX_SAMPLES_ESPNOW 60
 //Types of measurements that can be received through ESP-Now:
-enum ESPNOWdataTypes
-{
+enum ESPNOWdataTypes {
     BOILERTEMP,
     ROOMTEMP,
     CO2,
 };
 
 //Struct should be exact same as in Measurement device, measurement type is enumerated in ESPNOWdataTypes
-typedef struct ESP_message
-{
+typedef struct ESP_message {
     uint8_t measurementType;      //Type of measurement
     uint8_t numberofMeasurements; //number of measurements
     uint16_t index;               //Number identifying the message, only increments on receiving an ACK from Gateway
@@ -61,8 +59,7 @@ typedef struct ESP_message
 } ESP_message;
 
 //Struct for holding the P1 Data:
-typedef struct P1Data
-{
+typedef struct P1Data {
     uint8_t dsmrVersion;         // DSMR version without decimal point
     double elecUsedT1;           // Electrical Energy used Tariff 1 in kWh
     double elecUsedT2;           // Electrical Energy used Tariff 2 in kWh
@@ -85,7 +82,7 @@ typedef struct P1Data
 /**
  *  ========== FUNCTIONS ================
  */
-//Init
+ //Init
 
 void initP1UART();
 void initGPIO();
@@ -104,7 +101,7 @@ void printP1Data(P1Data *data);
 
 //HTTPS
 
-int postESPNOWbackoffice(char *JSONpayload);
+// void postESPNOWbackoffice(void *JSONpayload);
 int postP1Databackoffice(char *JSONpayload);
 
 

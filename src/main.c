@@ -41,12 +41,11 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
 } //gpio_isr_handler
 
 
-
 //Functions:
 #if defined(DEBUGHEAP)
 void pingHeap(void *);
 #endif
-void blink(void *args);
+// void blink(void *args);
 void buttonPressDuration(void *args);
 void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length);
 void read_P1(void *args);
@@ -63,23 +62,24 @@ void app_main(void) {
     uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from junk that might be received at boot
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 2048, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 4096, NULL, 10, NULL, 1);
     gpio_install_isr_service(0);
+    gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
 
     /* Initialize TCP/IP */
     ESP_ERROR_CHECK(esp_netif_init());
 
 
-    prepare_device();
 
     wifi_prov_mgr_config_t config = initialize_provisioning();
+    prepare_device();
     //Starts provisioning if not provisioned, otherwise skips provisioning.
     //If set to false it will not autoconnect after provisioning.
     //If set to true it will autonnect.
     start_provisioning(config, true);
     //Initialize time with timezone Europe and city Amsterdam
-    initialize_time("UTC");
+    initialize_time("CEST");
     //Gets time as epoch time.
     long now = time(NULL);
     //Log the time:
@@ -100,17 +100,25 @@ void app_main(void) {
 
     //Set to station mode for ESP-Now
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+
+    //Get the channel from NVS, if not yet stored, determine the channel and save it:
+    uint8_t espNowChannel = manageEspNowChannel();
+    uint8_t wifiChannel;
+    wifi_second_chan_t secondWiFiChannel;
+    esp_err_t err_wifi = esp_wifi_get_channel(&wifiChannel, &secondWiFiChannel);
+    if (err_wifi != ESP_OK) ESP_LOGE("MAIN", "Could not read WiFi channel: %s", esp_err_to_name(err_wifi));
+    ESP_LOGI("MAIN", "Connected to WiFi on channel %u, and using channel %u for ESP-Now!", wifiChannel, espNowChannel);
     //Check if disconnecting and reconnecting works:
     ESP_ERROR_CHECK(esp_now_init());
     uint8_t macAddress[6];
     esp_wifi_get_mac(ESP_IF_WIFI_STA, macAddress);
     ESP_LOGI("MAC", "My MAC address is: %02X:%02X:%02X:%02X:%02X:%02X\n", macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
-    //Now that internet is available, collect the bearer:
 
 
     //Register the ESP-Now receive callback
     esp_now_register_recv_cb(onDataReceive);
-    enable_wifi();
+    p1ConfigSetupEspNow(); //disable Wi-Fi and listen for ESP-Now messages
+
     //Create tasks:
     xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 4096, NULL, 10, NULL, 1);
 #if defined(DEBUGHEAP)
@@ -197,55 +205,71 @@ void pingHeap(void *args) {
 } //void pingAlive
 #endif
 
-/**Blink LEDs to test GPIO
- * @param args Pass two arguments in uint8_t array
- * @param argument[0] amount of blinks
- * @param argument[1] pin to blink on (LED_STATUS or LED_ERROR)
+ /**
+  * Check for input of buttons and the duration
+  * if the press duration was more than 5 seconds, erase the flash memory to restart provisioning
+  * otherwise, blink the status LED (and possibly run another task (sensor provisioning?))
  */
-void blink(void *args) {
-    uint8_t *arguments = (uint8_t *)args;
-    uint8_t pin = arguments[1];
-    uint8_t amount = arguments[0];
-    uint8_t i;
-    for (i = 0; i < amount; i++) {
-        gpio_set_level(pin, 1);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-        gpio_set_level(pin, 0);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-    } //for(i<amount)
-    //Delete the blink task after completion:
-    vTaskDelete(NULL);
-} //void blink;
-
-/**
- * Check for input of buttons and the duration
- * if the press duration was more than 5 seconds, erase the flash memory to restart provisioning
- * otherwise, blink the status LED (and possibly run another task (sensor provisioning?))
-*/
 void buttonPressDuration(void *args) {
     uint32_t io_num;
     while (1) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            uint8_t halfSeconds = 0;
-            while (!gpio_get_level(BUTTON_P2)) {
-                vTaskDelay(500 / portTICK_PERIOD_MS);
-                halfSeconds++;
-                if (halfSeconds == 19) {
-                    ESP_LOGI("ISR", "Button held for over 10 seconds\n");
-                    char blinkArgs[2] = { 5, LED_ERROR };
-                    xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                    //Long press on P2 is for clearing provisioning memory:
-                    esp_wifi_restore();
-                    vTaskDelay(1000 / portTICK_PERIOD_MS); //Wait for blink to finish
-                    esp_restart();                         //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change)
-                    break;                                 //Exit loop (this should not be reached)
-                }                                          //if (halfSeconds == 9)
-                //If the button gets released before 5 seconds have passed:
-                else if (gpio_get_level(BUTTON_P2)) {
-                    char blinkArgs[2] = { 5, LED_STATUS };
-                    xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                }
-            } //while(!gpio_level)
+            vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay
+            if (io_num == BUTTON_P2) {
+                uint8_t halfSeconds = 0;
+                while (!gpio_get_level(BUTTON_P2)) {
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
+                    halfSeconds++;
+                    if (halfSeconds == 19) {
+                        ESP_LOGI("ISR", "Button held for over 10 seconds\n");
+                        char blinkArgs[2] = { 5, LED_ERROR };
+                        xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
+                        //Long press on P2 is for clearing provisioning memory:
+                        esp_wifi_restore();
+                        vTaskDelay(1000 / portTICK_PERIOD_MS); //Wait for blink to finish
+                        esp_restart();                         //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change)
+                        break;                                 //Exit loop (this should not be reached)
+                    }                                          //if (halfSeconds == 9)
+                    //If the button gets released before 5 seconds have passed:
+                    else if (gpio_get_level(BUTTON_P2)) {
+                        char blinkArgs[2] = { 5, LED_STATUS };
+                        xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
+                    }
+                } //while(!gpio_level)
+            }
+            if (io_num == BUTTON_P1) {
+                uint8_t halfSeconds = 0;
+                while (!gpio_get_level(BUTTON_P1)) {
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
+                    halfSeconds++;
+                    if (halfSeconds == 9) {
+                        ESP_LOGI("ISR", "Button held for over 10 seconds\n");
+                        char blinkArgs[2] = { 5, LED_ERROR };
+                        xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
+                        //Long press on P1 is for clearing channel memory:
+                        esp_err_t err;
+                        nvs_handle_t channelHandle;
+                        err = nvs_open("twomes_storage", NVS_READWRITE, &channelHandle);
+                        if (err != ESP_OK) {
+                            ESP_LOGE("CHANNEL", "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+                        }
+                        err = nvs_erase_key(channelHandle, "espnowchannel");
+                        if (err != ESP_OK) ESP_LOGI("CHANNEL", "Failed to erase channel");
+                        else {
+                            nvs_commit(channelHandle);
+                            ESP_LOGI("CHANNEL", "deleted channel from NVS");
+                            vTaskDelay(1000 / portTICK_PERIOD_MS);
+                            esp_restart(); //reboot device to generate a new ESP-Now channel
+                        }
+                    }                                          //if (halfSeconds == 9)
+                    //If the button gets released before 5 seconds have passed:
+                    else if (gpio_get_level(BUTTON_P1)) {
+                        char blinkArgs[2] = { 5, LED_STATUS };
+                        xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
+                        xTaskCreatePinnedToCore(sendEspNowChannel, "pair_sensor", 2048, NULL, 15, NULL, 1); //Send data in relatively high priority task
+                    }
+                } //while(!gpio_level)
+            }
         }     //if(xQueueReceive)
     }         //while(1)
 } //task buttonDuration
@@ -258,14 +282,10 @@ void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length
     struct ESP_message ESPNowData;
     memcpy(&ESPNowData, payload, length);
     char *measurementsJSON = packageESPNowMessageJSON(&ESPNowData);
-    time_t now = time(NULL);
-    char *postJSON = malloc(JSON_BUFFER_SIZE);
-    postJSON[0] = 0; //initalise first element with 0 for printing
-    sprintf(postJSON, "{\"upload_time\": \"%ld\",", now);
-    postJSON = strcat(postJSON, measurementsJSON);
-    ESP_LOGI("ESPNOW", "Sending JSON to backoffice: %s", postJSON);
-    xTaskCreatePinnedToCore(postESPNOWbackoffice, "ESPNOW-POST", 4096, (void *)postJSON, 10, NULL, 1);
-    free(measurementsJSON); //TODO this should only be freed after successfull post, otherwise kept for buffering
+
+    //Create task to POST
+    xTaskCreatePinnedToCore(postESPNOWbackoffice, "ESPNOW-POST", 4096, (void *)measurementsJSON, 10, NULL, 1);
+
     ESP_LOGI("ESPNOW", "ESP-Now Callback ended"); //check if callback ends after creating task
 }
 
@@ -273,16 +293,44 @@ void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length
 /**
  * @brief Post ESP-Now data to the backoffice (fixed interval)
  *
- * @param data JSON stringified payload
- *
- * @return http code
+ * @param data JSON stringified payload, typecast to void*
  */
 void postESPNOWbackoffice(void *args) {
-    char *message = (char *)args;
-    char *response = post_https(fixed_interval_upload_url, message, rootCAR3, bearer);
+    p1ConfigSetupWiFi(); //connect to Wi-Fi
+
+    //Add the time of posting to the JSON message
+    time_t now = time(NULL);
+    char *postJSON = malloc(JSON_BUFFER_SIZE);
+    postJSON[0] = 0; //initalise first element with 0 for printing
+    sprintf(postJSON, "{\"upload_time\": \"%ld\",", now);
+    postJSON = strcat(postJSON, (char *)args);
+    ESP_LOGI("ESPNOW", "Sending JSON to backoffice: %s", postJSON);
+
+    //Post the JSON data to the backoffice
+    char *response = post_https(fixed_interval_upload_url, postJSON, rootCAR3, bearer);
     ESP_LOGI("HTTPS", "Response: %s", response);
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    free(message);
+
+    //Free all strings from heap 
+    //TODO: Keep "args" (JSON data without timestamp) for buffering
+    free(args);
+    // free(postJSON); //update to generic_esp_32, https string is freed inside post_https
     free(response);
+    p1ConfigSetupEspNow(); //Switch back to ESP-Now after post
     vTaskDelete(NULL); //Self destruct
 }
+
+#define USE_ESPNOW 1
+// #define USE_HTTPS 1
+
+#if USE_HTTPS && !(USE_ESPNOW)
+#warning Using HTTPS mode
+//HTTPS code
+#elif USE_ESPNOW && !(USE_HTTPS)
+#warning Using ESP - Now
+//ESP-Now code
+#elif USE_HTTPS && USE_ESPNOW
+#error Please select only one communication type
+#else
+#error No communication type selected
+#endif

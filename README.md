@@ -26,15 +26,14 @@ List of features ready and TODOs for future development.
 Ready:
 * Receive ESP-Now data from sensors
 * Package received data into JSON
-* Receive Network Credentials through BLE unified provisioning
+* Receive Network Credentials through SoftAP unified provisioning
 * indicate status and error through LEDs
 * Receive user input through buttons
-* Reset provisioning when P2 (GPIO 12) is held for over 10 seconds
-* Read P1 port and package into struct
+* Reset provisioning when P2 (GPIO 12) is held for over 5 seconds
 
 To-do:
 * Implement Channel and MAC provisioning to sensor nodes
-* Package P1 read data into JSON
+* Implement P1 reading and packaging
 * HTTPS post to backoffice
 
 ## Status
@@ -49,6 +48,7 @@ This software is available under the [Apache 2.0 license](./LICENSE.md), Copyrig
 This software is a collaborative effort the following students and researchers:
 * Fredrik-Otto Lautenbag ·  [@Fredrik1997](https://github.com/Fredrik1997)
 * Gerwin Buma ·  [@GerwinBuma](https://github.com/GerwinBuma) 
+* Werner Heetebrij ·  [@Werner-Heetebrij] (https://github.com/Werner-Heetebrij)
 * Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
 * Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
 

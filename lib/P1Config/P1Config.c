@@ -240,7 +240,16 @@ int postP1Databackoffice(char *JSONpayload) {
     return 0;
 }
 
-//Returns CRC
+
+/**
+ * @brief calculate the CRC16 of the P1 message (A001 polynomial)
+ *
+ * @param crc starting value of the crc, to allow for cumulative CRC (init with 0x0000 when scanning full message at once)
+ * @param buf pointer to the string to calculate the crc on
+ * @param len the length of the string
+ *
+ * @return the calculated CRC16
+ */
 unsigned int CRC16(unsigned int crc, unsigned char *buf, int len) {
     for (int pos = 0; pos < len; pos++) {
         crc ^= (unsigned int)buf[pos]; // XOR byte into least sig. byte of crc
@@ -340,7 +349,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
 /**
  * @brief print P1 struct data to UART1/LOGI
  *
- * @param *data pointer to P1Data type struct
+ * @param data pointer to P1Data type struct
  *
  */
 void printP1Data(P1Data *data) {
@@ -386,4 +395,193 @@ void printP1Error(int errorType) {
         default:
             break;
     }
+}
+
+/**
+ * @brief compare function for qsort
+ *
+ * @param a pointer to first value
+ * @param b pointer to second value
+ *
+ * @return 0 for equal, negative for b>a positive for a>b
+ *
+ */
+int compare(const void *a, const void *b) {
+    if (((*(uint8_t *)a) - (*(uint8_t *)b)) > 0) return 1; //if a-b > 0, a is larger than b
+    else if (((*(uint8_t *)a) - (*(uint8_t *)b)) < 0) return -1; //if a-b < 0, b is larger than a
+    else return 0; //if a-b == 0, a is equal to b
+}
+
+/**
+ * @brief scan all available Access Points and return their channels
+ *
+ * @param channelScanList pointer to a channelList struct for storing data
+ */
+void scanChannels(channelList *channelScanList) {
+    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
+    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_scan_start(NULL, true);
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_LOGI("SCAN", "Total APs scanned = %u", ap_count);
+    channelScanList->amount = ap_count;
+    for (int i = 0; (i < DEFAULT_SCAN_LIST_SIZE) && (i < ap_count); i++) {
+        channelScanList->channels[i] = ap_info[i].primary;
+        ESP_LOGI("SCAN", "Found Network with SSID %s on primary channel %d and secondary channel %d, with RSSI %d", ap_info[i].ssid, channelScanList->channels[i], (int)ap_info[i].second, ap_info[i].rssi);
+    }
+    esp_wifi_scan_stop();
+    // qsort(channelScanList->channels, channelScanList->amount, sizeof(uint8_t), compare);
+}
+
+/**
+ * @brief count how many acces points are using each channel
+ *
+ * @param channels list of channels found using scanChannels()
+ *
+ * @return pointer to array containing amount of APs on each channel
+ */
+uint8_t *countChannels(channelList *channels) {
+    uint8_t *channelOccurrances = malloc(AMOUNT_WIFI_CHANNELS);
+    uint8_t occurancesIndex = 0;
+    uint8_t count = 0;
+    for (occurancesIndex = 0; occurancesIndex < AMOUNT_WIFI_CHANNELS; occurancesIndex++) {
+        for (uint8_t i = 0; i < channels->amount; i++) {
+            //Channels start at 1, so add 1 to occurancesIndex
+            //If the channel is the same as the index, add one to count
+            if (channels->channels[i] == (occurancesIndex + 1)) {
+                count++;
+            }
+        }
+        channelOccurrances[occurancesIndex] = count;
+        count = 0;
+    }
+    return channelOccurrances;
+}
+
+/**
+ * @brief algorithm to find the lowest number in an array
+ *
+ * @param channels list returned by countChannels()
+ *
+ * @return the least used channel
+ */
+uint8_t findMinimum(uint8_t *channels) {
+    uint8_t position = 0;
+    uint8_t smallest = channels[0];
+    for (uint8_t i = 1; i < AMOUNT_WIFI_CHANNELS; i++) {
+        if (smallest > channels[i]) {
+            smallest = channels[i];
+            position = i;
+        }
+    }
+    return position + 1; //Add one, since the 0 in array is channel 1
+}
+
+/**
+ * @brief retrieve the channel to use for ESP-Now, and if none is found, generate a new one
+ *
+ * @return the channel to use for ESP-Now retrieved from NVS
+ */
+uint8_t manageEspNowChannel() {
+    esp_err_t err;
+    uint8_t channel;
+    nvs_handle_t channelHandle;
+    err = nvs_open("twomes_storage", NVS_READWRITE, &channelHandle);
+    if (err != ESP_OK) {
+        ESP_LOGE("CHANNEL", "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
+        return 0;
+    }
+
+    err = nvs_get_u8(channelHandle, "espnowchannel", &channel);
+    switch (err) {
+        case ESP_OK:
+            ESP_LOGI("CHANNEL", "Read channel %u from NVS!", channel);
+            return channel;
+        case ESP_ERR_NVS_NOT_FOUND:
+        {
+            //If not found, generate a channel
+            channelList channels;
+            scanChannels(&channels);
+            uint8_t *channelOccurances = countChannels(&channels);
+            for (uint8_t i = 0; i < AMOUNT_WIFI_CHANNELS; i++) {
+                ESP_LOGI("SCAN", "Channel %u occurs %u times", i + 1, channelOccurances[i]);
+            }
+            channel = findMinimum(channelOccurances);
+            ESP_LOGI("SCAN", "The least occuring channel is: %u, now storing to NVS", channel);
+            err = nvs_set_u8(channelHandle, "espnowchannel", channel);
+            if (err == ESP_OK) {
+                nvs_commit(channelHandle);
+                ESP_LOGI("CHANNEL", "Succesfully wrote channel to NVS");
+                return channel;
+            }
+            else {
+                ESP_LOGE("CHANNEL", "Failed to write channel to twomes_storage: %s", esp_err_to_name(err));
+                return 0;
+            }
+        }
+        default:
+            ESP_LOGE("CHANNEL", "Error (%s) reading!\n", esp_err_to_name(err));
+            return 0;
+    }
+}
+
+/**
+ * @brief sends the ESP-Now channel and MAC address to a sensor using ESP-Now broadcast on WiFi channel 1
+ *
+ */
+void sendEspNowChannel(void *args) {
+    uint8_t channel = manageEspNowChannel(); //Get channel from NVS, should this be given as a param from RAM?
+
+    disconnect_wifi(); //Disable the Generic Twomes Auto-Connect feature, to allow channel switching
+    esp_now_init(); //Initialise ESP-Now
+
+    //Set the channel to the channel devices use for pairing:
+    esp_wifi_set_channel(ESPNOW_PAIRING_CHANNEL, WIFI_SECOND_CHAN_NONE);
+
+    uint8_t primary;
+    wifi_second_chan_t secondary;
+    esp_wifi_get_channel(&primary, &secondary); //Read the channel to validate we changed it
+    ESP_LOGI("ESPNOW", "Now on WiFi channel %u", primary);
+    uint8_t broadcastAddress[6] = { 0xff,0xff,0xff,0xff,0xff,0xff };
+    esp_now_peer_info_t broadCastPeer;
+    memcpy(broadCastPeer.peer_addr, broadcastAddress, 6); //Copy the broadcast address to the peer
+    esp_now_add_peer(&broadCastPeer);
+    //Using a broadcast, using a callBack function for checking is not possible, use LEDs on sensor to indicate receiving a message!
+    // esp_now_register_send_cb(sendChannelCallback);
+    esp_err_t err = esp_now_send(broadcastAddress, &channel, 1); //Only need to send channel, MAC can be read from message already
+    if (err != ESP_OK) ESP_LOGI("ESPNOW-PAIR", "ERROR sending ESP-Now channel: %s", esp_err_to_name(err));
+    else ESP_LOGI("ESPNOW-PAIR", "Sent channel with succes!");
+
+    //End the RTOS task:
+    vTaskDelete(NULL);
+}
+
+/**
+ * @brief turn off Wi-Fi capabilities and switch to the ESP-Now channel
+ *
+ * @return succes status
+ */
+int p1ConfigSetupWiFi() {
+    connect_wifi(); //Re-enable Wi-Fi through Generic Twomes Firmware, should automatically swap channel on connecting
+
+    // obtain_time(); //Reconnect with time server
+    return 0;
+}
+
+
+/**
+ * @brief turn off ESP-now capabilities and connect to Wi-Fi
+ *
+ * @return succes status
+ */
+int p1ConfigSetupEspNow() {
+    disconnect_wifi(); //Disable Twomes autoconnect and disconnect from Wi-Fi
+    uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
+    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+    return 0;
 }

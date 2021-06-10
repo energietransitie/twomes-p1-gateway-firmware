@@ -11,11 +11,29 @@
 #include <freertos/event_groups.h>
 #include <esp_system.h>
 #include <esp_log.h>
+#include <nvs_flash.h>
+#include <esp_wifi.h>
 #include <driver/uart.h>
 #include <driver/gpio.h>
 
-#define VERSION "V1.0"
+#include <esp_now.h>
 
+#include <generic_esp_32.h>
+
+
+#define P1CONFIG_VERSION "V0.9.0"
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#pragma message "Using P1Config version "  STR(P1CONFIG_VERSION)
+
+//Pin definitions:
+#define BUTTON_P1 GPIO_NUM_0
+#define BUTTON_P2 GPIO_NUM_12
+#define LED_ERROR GPIO_NUM_22
+#define LED_STATUS GPIO_NUM_14
+#define PIN_DRQ GPIO_NUM_17
+#define OUTPUT_BITMASK ((1ULL << LED_ERROR) | (1ULL << LED_STATUS) | (1ULL << PIN_DRQ))
+#define INPUT_BITMASK ((1ULL << BUTTON_P1) | (1ULL << BUTTON_P2))
 //UART defines
 #define P1_BUFFER_SIZE 1024
 #define P1PORT_UART_NUM UART_NUM_2
@@ -32,15 +50,12 @@
 #define VARIABLE_INTERVAL_ADDRESS "/device/measurements/variable-interval"
 #define JSON_BUFFER_SIZE 2048
 
-//Pin definitions:
-#define BUTTON_P1 GPIO_NUM_0
-#define BUTTON_P2 GPIO_NUM_12
-#define LED_ERROR GPIO_NUM_13
-#define LED_STATUS GPIO_NUM_14
-#define PIN_DRQ GPIO_NUM_17
-#define OUTPUT_BITMASK ((1ULL << LED_ERROR) | (1ULL << LED_STATUS) | (1ULL << PIN_DRQ))
-#define INPUT_BITMASK ((1ULL << BUTTON_P1) | (1ULL << BUTTON_P2))
+//WIFI Scan
+#define DEFAULT_SCAN_LIST_SIZE 25   //Amount of APs to scan
+#define AMOUNT_WIFI_CHANNELS 13     //Amount of available WIFI channels
 
+//ESP-Now
+#define ESPNOW_PAIRING_CHANNEL 1
 #define MAX_SAMPLES_ESPNOW 60
 //Types of measurements that can be received through ESP-Now:
 enum ESPNOWdataTypes {
@@ -48,7 +63,6 @@ enum ESPNOWdataTypes {
     ROOMTEMP,
     CO2,
 };
-
 //Struct should be exact same as in Measurement device, measurement type is enumerated in ESPNOWdataTypes
 typedef struct ESP_message {
     uint8_t measurementType;      //Type of measurement
@@ -69,6 +83,12 @@ typedef struct P1Data {
     double gasUsage;             // Gasverbruik in dm3
     char timeGasMeasurement[14]; // Timestamp for most recent gas measurement YY:MM:DD:HH:MM:SS And S/W for summer or winter time
 } P1Data;
+
+typedef struct channelListstruct {
+    uint8_t amount;
+    uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
+}channelList;
+
 //Error types for P1 data reading:
 #define P1_READ_OK 0
 #define P1_ERROR_DSMR_NOT_FOUND 1
@@ -82,6 +102,7 @@ typedef struct P1Data {
 /**
  *  ========== FUNCTIONS ================
  */
+
  //Init
 
 void initP1UART();
@@ -103,6 +124,19 @@ void printP1Data(P1Data *data);
 
 // void postESPNOWbackoffice(void *JSONpayload);
 int postP1Databackoffice(char *JSONpayload);
+
+//Channel selection:
+void scanChannels();
+int compare();
+uint8_t *countChannels(channelList *channelList);
+uint8_t findMinimum(uint8_t *channelList);
+uint8_t manageEspNowChannel();
+void sendEspNowChannel(void *args);
+
+//Network switching
+
+int p1ConfigSetupWiFi();    //Turn off ESP-Now and communicate with the webserver
+int p1ConfigSetupEspNow(); //Turn off Wi-Fi and start listening for ESP-Now messages
 
 
 #endif //ifndef _P1CONFIG_H

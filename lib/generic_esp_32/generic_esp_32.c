@@ -2,13 +2,14 @@
 
 static const char *TAG = "Twomes Generic Firmware Library ESP32";
 bool activation = false;
-//Interrupt Queue Handler:
-static xQueueHandle gpio_evt_queue = NULL;
+
+static EventGroupHandle_t wifi_event_group;
 
 /* Signal Wi-Fi events on this event-group */
 const int WIFI_CONNECTED_EVENT = BIT0;
-static EventGroupHandle_t wifi_event_group;
 
+bool wifi_initialized = false;
+bool wifi_autoconnect = true;
 #ifdef CONFIG_SNTP_TIME_SYNC_METHOD_CUSTOM
 void sntp_sync_time(struct timeval *tv) {
     settimeofday(tv, NULL);
@@ -17,7 +18,10 @@ void sntp_sync_time(struct timeval *tv) {
 }
 #endif
 
-#ifndef CUSTOM_IO
+#ifndef CONFIG_TWOMES_CUSTOM_GPIO
+//Interrupt Queue Handler:
+static xQueueHandle gpio_evt_queue = NULL;
+
 //Gpio ISR handler:
 static void IRAM_ATTR gpio_isr_handler(void *arg) {
     uint32_t gpio_num = (uint32_t)arg;
@@ -42,45 +46,6 @@ void initGPIO() {
     io_conf.pull_up_en = 1;
     gpio_config(&io_conf);
 }
-#endif
-void initialize() {
-    /* Initialize the event loop */
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    wifi_event_group = xEventGroupCreate();
-#ifndef CUSTOM_IO
-    initGPIO();
-    //Attach interrupt handler to GPIO pins:
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 2048, NULL, 10, NULL, 1);
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(WIFI_RESET_BUTTON, gpio_isr_handler, (void *)WIFI_RESET_BUTTON);
-#endif
-}
-
-void time_sync_notification_cb(struct timeval *tv) {
-    ESP_LOGI(TAG, "Notification of a time synchronization event");
-}
-
-#ifndef CUSTOM_IO
-/**Blink LEDs to test GPIO:
- * Pass two arguments in uint8_t array:
- * argument[0] = amount of blinks
- * argument[1] = pin to blink on (LED_STATUS or LED_ERROR)
- */
-void blink(void *args) {
-    uint8_t *arguments = (uint8_t *)args;
-    uint8_t amount = arguments[0];
-    uint8_t pin = arguments[1];
-    uint8_t i;
-    for (i = 0; i < amount; i++) {
-        gpio_set_level(pin, 1);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-        gpio_set_level(pin, 0);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-    } //for(i<amount)
-    //Delete the blink task after completion:
-    vTaskDelete(NULL);
-} //void blink;
 
 /**
  * Check for input of buttons and the duration
@@ -113,13 +78,46 @@ void buttonPressDuration(void *args) {
 }
 #endif
 
-/**
- *
- * @param stringf the string to scan
- * @param count the amount of types in the string
- *
- * @return string on heap containing the types (free after using!)
+/**Blink LEDs to test GPIO:
+ * Pass two arguments in uint8_t array:
+ * argument[0] = amount of blinks
+ * argument[1] = pin to blink on (LED_STATUS or LED_ERROR)
  */
+void blink(void *args) {
+    uint8_t *arguments = (uint8_t *)args;
+    uint8_t amount = arguments[0];
+    uint8_t pin = arguments[1];
+    uint8_t i;
+    for (i = 0; i < amount; i++) {
+        gpio_set_level(pin, 1);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+        gpio_set_level(pin, 0);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+    } //for(i<amount)
+    //Delete the blink task after completion:
+    vTaskDelete(NULL);
+} //void blink;
+
+void initialize() {
+    ESP_LOGI(TAG, "Generic Firmware Version: %s", VERSION);
+
+    /* Initialize the event loop */
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    wifi_event_group = xEventGroupCreate();
+#ifndef CONFIG_TWOMES_CUSTOM_GPIO
+    initGPIO();
+    //Attach interrupt handler to GPIO pins:
+    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 2048, NULL, 10, NULL, 1);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(WIFI_RESET_BUTTON, gpio_isr_handler, (void *)WIFI_RESET_BUTTON);
+#endif
+}
+
+void time_sync_notification_cb(struct timeval *tv) {
+    ESP_LOGI(TAG, "Notification of a time synchronization event");
+}
+
 char *get_types(char *stringf, int count) {
     char *stringfBuffer = stringf;
     char c = *stringf;
@@ -209,8 +207,11 @@ void prov_event_handler(void *arg, esp_event_base_t event_base,
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(TAG, "Disconnected. Connecting to the AP again...");
-        esp_wifi_connect();
+        ESP_LOGI(TAG, "Disconnected.");
+        if (wifi_autoconnect) {
+            ESP_LOGI(TAG, " Connecting to the AP again...");
+            esp_wifi_connect();
+        }
     }
 }
 
@@ -293,56 +294,56 @@ void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-void create_pop() {
+void create_dat() {
     esp_err_t err;
-    uint32_t pop;
-    nvs_handle_t pop_handle;
-    err = nvs_open("twomes_storage", NVS_READWRITE, &pop_handle);
+    uint32_t dat;
+    nvs_handle_t dat_handle;
+    err = nvs_open("twomes_storage", NVS_READWRITE, &dat_handle);
     if (err) {
         ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
     }
     else {
         ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
-        err = nvs_get_u32(pop_handle, "pop", &pop);
+        err = nvs_get_u32(dat_handle, "dat", &dat);
         switch (err) {
             case ESP_OK:
-                ESP_LOGI(TAG, "The PoP was initialized already!\n");
-                ESP_LOGI(TAG, "The PoP is: %u\n", pop);
+                ESP_LOGI(TAG, "The dat was initialized already!\n");
+                ESP_LOGI(TAG, "The dat is: %u\n", dat);
                 break;
             case ESP_ERR_NVS_NOT_FOUND:
-                ESP_LOGI(TAG, "The PoP is not initialized yet!");
-                ESP_LOGI(TAG, "Creating PoP");
-                pop = esp_random();
-                ESP_LOGI(TAG, "Attempting to store PoP: %d", pop);
-                err = nvs_set_u32(pop_handle, "pop", pop);
+                ESP_LOGI(TAG, "The dat is not initialized yet!");
+                ESP_LOGI(TAG, "Creating dat");
+                dat = esp_random();
+                ESP_LOGI(TAG, "Attempting to store dat: %d", dat);
+                err = nvs_set_u32(dat_handle, "dat", dat);
                 if (!err) {
-                    ESP_LOGI(TAG, "Succesfully wrote PoP: %u to NVS twomes_storage", pop);
+                    ESP_LOGI(TAG, "Succesfully wrote dat: %u to NVS twomes_storage", dat);
                 }
                 else {
-                    ESP_LOGE(TAG, "Failed to write PoP to NVS twomes_storage: %s", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Failed to write dat to NVS twomes_storage: %s", esp_err_to_name(err));
                 }
                 break;
             default:
                 printf("Error (%s) reading!\n", esp_err_to_name(err));
         }
-        nvs_close(pop_handle);
+        nvs_close(dat_handle);
     }
-    ESP_LOGI(TAG, "POP: %u", pop);
+    ESP_LOGI(TAG, "dat: %u", dat);
 }
 
-void get_pop(uint32_t *buf) {
+void get_dat(uint32_t *buf) {
     esp_err_t err;
-    nvs_handle_t pop_handle;
-    err = nvs_open("twomes_storage", NVS_READWRITE, &pop_handle);
+    nvs_handle_t dat_handle;
+    err = nvs_open("twomes_storage", NVS_READWRITE, &dat_handle);
     if (err) {
         ESP_LOGE(TAG, "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
     }
     else {
         ESP_LOGE(TAG, "Succesfully opened NVS twomes_storage!");
-        err = nvs_get_u32(pop_handle, "pop", buf);
+        err = nvs_get_u32(dat_handle, "dat", buf);
         switch (err) {
             case ESP_OK:
-                ESP_LOGI(TAG, "The PoP has succesfully been read!\n");
+                ESP_LOGI(TAG, "The dat has succesfully been read!\n");
                 break;
             default:
                 ESP_LOGE(TAG, "%s", esp_err_to_name(err));
@@ -352,28 +353,48 @@ void get_pop(uint32_t *buf) {
 }
 
 void prepare_device() {
-    create_pop();
-    uint32_t pop;
-    get_pop(&pop);
-    //device_name does not get returned at the end of this function, so it cannot be used by anything outside of this function, does it never get deleted? Does it need to remain existing?
-    char *device_name = malloc(DEVICE_NAME_SIZE); //Should this be one longer and have a \0 at the end?
+    if (wifi_initialized) {
+        ESP_LOGI(TAG, "Wi-Fi has been enabled for true random dat generation!");
+        create_dat();
+    }
+    else {
+        ESP_LOGI(TAG, "Wi-Fi has not been enabled for true random dat generation, enabling Wi-Fi!");
+        enable_wifi();
+        while (!wifi_initialized) {
+            ESP_LOGI(TAG, "Waiting for Wi-Fi enable to finish.");
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        };
+        ESP_LOGI(TAG, "Disabling Wi-Fi again as to not disturb provisioning.");
+        disable_wifi();
+    }
+    uint32_t dat;
+    get_dat(&dat);
+    char *device_name = malloc(DEVICE_NAME_SIZE);
     get_device_service_name(device_name, DEVICE_NAME_SIZE);
-
-    char *qr_code_payload_template = "{\"ver\":\"v1\",\"name\":\"%s\",\"pop\":\"%u\",\"transport\":\"ble\"}";
-    int qr_code_payload_size = variable_sprintf_size(qr_code_payload_template, 2, device_name, pop);
+#ifdef CONFIG_TWOMES_PROV_TRANSPORT_BLE
+    char *qr_code_payload_template = "\n\n{\"ver\":\"v1\",\"name\":\"%s\",\"pop\":\"%u\",\"transport\":\"ble\"}\n\n";
+    int qr_code_payload_size = variable_sprintf_size(qr_code_payload_template, 2, device_name, dat);
     char *qr_code_payload = malloc(qr_code_payload_size);
-    snprintf(qr_code_payload, qr_code_payload_size, qr_code_payload_template, device_name, pop);
+    snprintf(qr_code_payload, qr_code_payload_size, qr_code_payload_template, device_name, dat);
+#endif
+#ifdef CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP
+    char *qr_code_payload_template = "\n\n{\"ver\":\"v1\",\"name\":\"%s\",\"pop\":\"%u\",\"transport\":\"ble\",\"security\":\"1\",\"password\":\"%s\"}\n\n";
+    int qr_code_payload_size = variable_sprintf_size(qr_code_payload_template, 2, device_name, dat, dat);
+    char *qr_code_payload = malloc(qr_code_payload_size);
+    snprintf(qr_code_payload, qr_code_payload_size, qr_code_payload_template, device_name, dat, dat);
+#endif
+
     ESP_LOGI(TAG, "QR Code Payload: ");
     ESP_LOGI(TAG, "%s", qr_code_payload);
-    free(qr_code_payload); //Don't think this is used anymore after printing it
-    // free(device_name); //Is this okay to free?
+    free(qr_code_payload);
+    free(device_name);
 }
 
 void get_device_service_name(char *service_name, size_t max) {
     uint8_t eth_mac[6];
     const char *ssid_prefix = SSID_PREFIX;
     esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
-    snprintf(service_name, max, "%s%02x%02x%02x",
+    snprintf(service_name, max, "%s%02X%02X%02X",
         ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
 }
 
@@ -408,7 +429,7 @@ void initialize_sntp(void) {
     sntp_init();
 }
 
-void obtain_time(void) {
+void obtain_time(int retry_count) {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -423,7 +444,7 @@ void obtain_time(void) {
     time_t now = 0;
     struct tm timeinfo = { 0 };
     int retry = 0;
-    const int retry_count = 10;
+    // const int retry_count = 10;
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
         ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -439,7 +460,7 @@ void initialize_time(char *timezone) {
     localtime_r(&now, &timeinfo);
     if (timeinfo.tm_year < (2016 - 1900)) {
         ESP_LOGI(TAG, "Time is not set yet. Connecting to Wi-Fi and getting time over NTP.");
-        obtain_time();
+        obtain_time(50);
         // update 'now' variable with current time
         time(&now);
     }
@@ -472,8 +493,6 @@ void upload_heartbeat(const char *variable_interval_upload_url, const char *root
     //Posting data over HTTPS, using url, msg and bearer token.
     ESP_LOGI(TAG, "Data: %s", msg);
     post_https(variable_interval_upload_url, msg, root_cert, bearer);
-    //Free message after POST
-    free(msg);
 }
 
 void post_http(const char *url, char *data, char *authenticationToken) {
@@ -502,7 +521,10 @@ void post_http(const char *url, char *data, char *authenticationToken) {
     }
     esp_http_client_cleanup(client);
     free(dataLenStr);
-    free(authenticationTokenString);
+    free(data);
+    if (authenticationToken) {
+        free(authenticationTokenString);
+    }
 }
 
 esp_err_t store_bearer(char *bearer) {
@@ -563,13 +585,13 @@ char *get_bearer() {
 
 void activate_device(const char *url, char *name, const char *cert) {
     esp_err_t err;
-    uint32_t pop;
-    get_pop(&pop);
+    uint32_t dat;
+    get_dat(&dat);
     activation = true;
-    char *device_activation_plain = "{ \"proof_of_presence_id\":\"%u\"}";
-    int activation_data_size = variable_sprintf_size(device_activation_plain, 1, pop);
+    char *device_activation_plain = "{ \"activation_token\":\"%u\"}";
+    int activation_data_size = variable_sprintf_size(device_activation_plain, 1, dat);
     char *device_activation_data = malloc(activation_data_size);
-    snprintf(device_activation_data, activation_data_size, device_activation_plain, pop);
+    snprintf(device_activation_data, activation_data_size, device_activation_plain, dat);
 
     ESP_LOGI(TAG, "%s", device_activation_data);
     char *bearer = post_https(url, device_activation_data, cert, NULL);
@@ -578,31 +600,28 @@ void activate_device(const char *url, char *name, const char *cert) {
     }
     else {
         ESP_LOGE(TAG, "Bearer after post is: %s", bearer);
-        char *bearer_extracted = malloc(strlen(bearer) * sizeof(char));
-        sscanf(bearer, "{ \"session_token\":\"%s\" }", bearer_extracted);
-        ESP_LOGE(TAG, "Bearer Extracted: %s", bearer_extracted);
-        int extracted_size = strlen(bearer_extracted) * sizeof(char);
-        char *bearer_trimmed = malloc(extracted_size);
+        int size = strlen(bearer) * sizeof(char);
+        char *bearer_trimmed = malloc(size);
         char c = *bearer;
         int count = 0;
         int length = 0;
         bool done = false;
         while (!done) {
             switch (c) {
-                case '\"':
+                case '"':
                     count++;
-                    if (count == 4) {
+                    if (count == 3) {
                         *bearer_trimmed = '\0';
                         done = true;
                     }
                     break;
                 default:
-                    if (count == 3) {
+                    if (count == 2) {
                         *bearer_trimmed++ = c;
                         length++;
                     }
             }
-
+            ESP_LOGI(TAG, "Loopsies! %c", c);
             c = *++bearer;
         }
         bearer_trimmed -= length;
@@ -611,7 +630,6 @@ void activate_device(const char *url, char *name, const char *cert) {
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Error (%s) reading!\n", esp_err_to_name(err));
         }
-        free(device_activation_data); //Activation string no longer needed
     }
 }
 
@@ -631,16 +649,6 @@ void get_http(const char *url) {
     esp_http_client_cleanup(client);
 }
 
-/**
- * @brief Post data over secure https
- *
- * @param url the URL to post to
- * @param data POST payload
- * @param cert HTTPS certificate
- * @param authenticationToken authentication token
- *
- * @return Response message, on heap (Free this after processing!)
- */
 char *post_https(const char *url, char *data, const char *cert, char *authenticationToken) {
     int content_length;
     int status_code = 0;
@@ -655,7 +663,7 @@ char *post_https(const char *url, char *data, const char *cert, char *authentica
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_header(client, "Host", TWOMES_TEST_SERVER_HOSTNAME);
     esp_http_client_set_header(client, "Content-Type", "text/plain");
-    char *authenticationTokenString = ""; //Moved to larger scope to free at end
+    char *authenticationTokenString = "";
     if (authenticationToken) {
         char *authenticationTokenStringPlain = "Bearer %s";
         int strCount = snprintf(authenticationTokenString, 0, authenticationTokenStringPlain, authenticationToken) + 1;
@@ -667,6 +675,8 @@ char *post_https(const char *url, char *data, const char *cert, char *authentica
     esp_err_t err = esp_http_client_perform(client);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+        free(authenticationTokenString);
+        return NULL;
     }
     else {
         status_code = esp_http_client_get_status_code(client);
@@ -674,24 +684,25 @@ char *post_https(const char *url, char *data, const char *cert, char *authentica
         if (content_length > 0) {
             ESP_LOGE(TAG, "Status Code: %d Response Length: %d", status_code,
                 content_length);
-            response = malloc((sizeof(char) * content_length) + 1); //Add an extra space for \0 string terminator
+            response = malloc(sizeof(char) * content_length);
             esp_http_client_read(client, response, content_length);
-            response[content_length] = '\0';
             ESP_LOGE(TAG, "Response: %s", response);
         }
         else {
             ESP_LOGE(TAG, "No proper response, response length: %d status_code: %d", content_length, status_code);
         }
     }
-    free(authenticationTokenString);
+    if (authenticationToken) {
+        free(authenticationTokenString);
+    }
+    free(data);
     esp_http_client_cleanup(client);
-    // if (response && status_code == 200) {
-    //     return response;
-    // }
-    // else {
-    //     return NULL;
-    // }
-    return response;
+    if (response && status_code == 200) {
+        return response;
+    }
+    else {
+        return NULL;
+    }
 }
 
 wifi_prov_mgr_config_t initialize_provisioning() {
@@ -702,9 +713,10 @@ wifi_prov_mgr_config_t initialize_provisioning() {
 
     /* Initialize Wi-Fi including netif with default config */
     esp_netif_create_default_wifi_sta();
-#ifdef CONFIG_EXAMPLE_PROV_TRANSPORT_SOFTAP
+    wifi_initialized = true;
+#ifdef CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP
     esp_netif_create_default_wifi_ap();
-#endif /* CONFIG_EXAMPLE_PROV_TRANSPORT_SOFTAP */
+#endif /* CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
@@ -712,12 +724,12 @@ wifi_prov_mgr_config_t initialize_provisioning() {
     wifi_prov_mgr_config_t config = {
         /* What is the Provisioning Scheme that we want ?
              * wifi_prov_scheme_softap or wifi_prov_scheme_ble */
-    #ifdef CONFIG_EXAMPLE_PROV_TRANSPORT_BLE
+    #ifdef CONFIG_TWOMES_PROV_TRANSPORT_BLE
             .scheme = wifi_prov_scheme_ble,
-    #endif /* CONFIG_EXAMPLE_PROV_TRANSPORT_BLE */
-    #ifdef CONFIG_EXAMPLE_PROV_TRANSPORT_SOFTAP
+    #endif /* CONFIG_TWOMES_PROV_TRANSPORT_BLE */
+    #ifdef CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP
             .scheme = wifi_prov_scheme_softap,
-    #endif /* CONFIG_EXAMPLE_PROV_TRANSPORT_SOFTAP */
+    #endif /* CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP */
 
             /* Any default scheme specific event handler that you would
                  * like to choose. Since our example application requires
@@ -727,12 +739,12 @@ wifi_prov_mgr_config_t initialize_provisioning() {
                  * appropriate scheme specific event handler allows the manager
                  * to take care of this automatically. This can be set to
                  * WIFI_PROV_EVENT_HANDLER_NONE when using wifi_prov_scheme_softap*/
-        #ifdef CONFIG_EXAMPLE_PROV_TRANSPORT_BLE
+        #ifdef CONFIG_TWOMES_PROV_TRANSPORT_BLE
                 .scheme_event_handler = WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM
-        #endif /* CONFIG_EXAMPLE_PROV_TRANSPORT_BLE */
-        #ifdef CONFIG_EXAMPLE_PROV_TRANSPORT_SOFTAP
+        #endif /* CONFIG_TWOMES_PROV_TRANSPORT_BLE */
+        #ifdef CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP
                                             .scheme_event_handler = WIFI_PROV_EVENT_HANDLER_NONE
-        #endif /* CONFIG_EXAMPLE_PROV_TRANSPORT_SOFTAP */
+        #endif /* CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP */
     };
     return config;
 }
@@ -760,30 +772,30 @@ void start_provisioning(wifi_prov_mgr_config_t config, bool connect) {
         /* What is the security level that we want (0 or 1):
          *      - WIFI_PROV_SECURITY_0 is simply plain text communication.
          *      - WIFI_PROV_SECURITY_1 is secure communication which consists of secure handshake
-         *          using X25519 key exchange and proof of possession (pop) and AES-CTR
+         *          using X25519 key exchange and device.activaton_token (dat) and AES-CTR
          *          for encryption/decryption of messages.
          */
         wifi_prov_security_t security = WIFI_PROV_SECURITY_1;
 
-        /* Do we want a proof-of-possession (ignored if Security 0 is selected):
+        /* Do we want a device.activaton_token (ignored if Security 0 is selected):
          *      - this should be a string with length > 0
          *      - NULL if not used
          */
-        uint32_t pop;
-        get_pop(&pop);
-        int msgSize = variable_sprintf_size("%u", 1, pop);
-        char *pop_str = malloc(msgSize);
+        uint32_t dat;
+        get_dat(&dat);
+        int msgSize = variable_sprintf_size("%u", 1, dat);
+        char *dat_str = malloc(msgSize);
         //Inputting variables into the plain json string from above(msgPlain).
-        snprintf(pop_str, msgSize, "%u", pop);
+        snprintf(dat_str, msgSize, "%u", dat);
 
         /* What is the service key (could be NULL)
          * This translates to :
          *     - Wi-Fi password when scheme is wifi_prov_scheme_softap
          *     - simply ignored when scheme is wifi_prov_scheme_ble
          */
-        const char *service_key = NULL;
+        char *service_key = dat_str;
 
-#ifdef CONFIG_EXAMPLE_PROV_TRANSPORT_BLE
+#ifdef CONFIG_TWOMES_PROV_TRANSPORT_BLE
         /* This step is only useful when scheme is wifi_prov_scheme_ble. This will
          * set a custom 128 bit UUID which will be included in the BLE advertisement
          * and will correspond to the primary GATT service that provides provisioning
@@ -814,7 +826,7 @@ void start_provisioning(wifi_prov_mgr_config_t config, bool connect) {
             0x02,
         };
         wifi_prov_scheme_ble_set_service_uuid(custom_service_uuid);
-#endif /* CONFIG_EXAMPLE_PROV_TRANSPORT_BLE */
+#endif /* CONFIG_TWOMES_PROV_TRANSPORT_BLE */
 
         /* An optional endpoint that applications can create if they expect to
          * get some additional custom data during provisioning workflow.
@@ -823,7 +835,7 @@ void start_provisioning(wifi_prov_mgr_config_t config, bool connect) {
          */
          // wifi_prov_mgr_endpoint_create("custom-data");
          /* Start provisioning service */
-        ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, pop_str, service_name, service_key));
+        ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, dat_str, service_name, service_key));
 
         /* The handler for the optional endpoint created above.
          * This call must be made after starting the provisioning, and only if the endpoint
@@ -858,6 +870,7 @@ void start_provisioning(wifi_prov_mgr_config_t config, bool connect) {
 void disable_wifi() {
     if (esp_wifi_stop() == ESP_OK) {
         ESP_LOGI(TAG, "Disabled Wi-Fi");
+        wifi_initialized = false;
     }
     else {
         ESP_LOGE(TAG, "Failed to disable Wi-Fi");
@@ -867,9 +880,32 @@ void disable_wifi() {
 void enable_wifi() {
     if (esp_wifi_start() == ESP_OK) {
         ESP_LOGI(TAG, "Enabled Wi-Fi");
+        wifi_initialized = true;
     }
     else {
         ESP_LOGE(TAG, "Failed to enable Wi-Fi");
+    }
+}
+
+void disconnect_wifi() {
+    wifi_autoconnect = false;
+    esp_err_t err = esp_wifi_disconnect();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to disconnect Wi-Fi: %s", esp_err_to_name(err));
+    }
+    else {
+        ESP_LOGI(TAG, "Disconnected Wi-Fi");
+    }
+}
+
+void connect_wifi() {
+    esp_err_t err = esp_wifi_connect();
+    wifi_autoconnect = true;
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to connect to Wi-Fi: %s", esp_err_to_name(err));
+    }
+    else {
+        ESP_LOGI(TAG, "Succesfully connected Wi-Fi");
     }
 }
 

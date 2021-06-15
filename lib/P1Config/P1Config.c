@@ -1,6 +1,8 @@
 #include "P1Config.h"
 
-//Function to initialise the P1 Port UART Receiver, 115200 Baud 8N1, no flow control:
+/**
+ * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
+ */
 void initP1UART() {
     //UART Configuration for P1-Port reading:
     //115200 baud, 8n1, no parity, no HW flow control
@@ -18,7 +20,9 @@ void initP1UART() {
     ESP_ERROR_CHECK(uart_driver_install(P1PORT_UART_NUM, P1_BUFFER_SIZE * 2, 0, 0, NULL, 0));
 }
 
-//Function to initialise the buttons and LEDs on the gateway, with interrupts on the buttons
+/**
+ * @brief Initalise pushbuttons, LEDs and Data-Request pin
+ */
 void initGPIO() {
     gpio_config_t io_conf;
     //CONFIGURE OUTPUTS:
@@ -180,7 +184,15 @@ char *packageESPNowMessageJSON(ESP_message *message) {
     } //switch messagetype
 }
 
-char *packageP1portJSON(P1Data *data) {
+
+/**
+ * @brief Package P1 Measurements message into Twomes JSON format
+ *
+ * @param data the P1 data struct
+ *
+ * @return pointer to JSON string on heap (NEEDS TO BE FREED)
+ */
+char *packageP1MessageJSON(P1Data *data) {
     //Get current time:
     unsigned int now = time(NULL);
     char *JSONformat =
@@ -223,21 +235,15 @@ char *packageP1portJSON(P1Data *data) {
         "]}";
     char *P1JSONbuffer = malloc(JSON_BUFFER_SIZE);
     //print measurement data into JSON string:
-    sprintf(P1JSONbuffer, JSONformat, now, data, now, data->elecUsedT1, now, data->elecUsedT2, now, data->elecDeliveredT1, now, data->elecDeliveredT2, now, data->gasUsage, now, data->timeGasMeasurement);
+    sprintf(P1JSONbuffer, JSONformat, \
+        now, data->elecUsedT1, \
+        now, data->elecUsedT2, \
+        now, data->elecDeliveredT1, \
+        now, data->elecDeliveredT2, \
+        now, data->timeElecMeasurement, \
+        now, data->gasUsage, \
+        now, data->timeGasMeasurement);
     return P1JSONbuffer;
-}
-
-
-
-/**
- * @brief Post P1 port data to the backoffice (fixed interval)
- *
- * @param data JSON stringified payload
- *
- * @return http code
- */
-int postP1Databackoffice(char *JSONpayload) {
-    return 0;
 }
 
 
@@ -584,4 +590,79 @@ int p1ConfigSetupEspNow() {
     uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
     return 0;
+}
+
+/**
+ * @brief Post ESP-Now data to the backoffice (fixed interval)
+ *
+ * @param data JSON stringified payload, typecast to void*
+ */
+void postESPNOWbackoffice(void *args) {
+    p1ConfigSetupWiFi(); //connect to Wi-Fi
+    //Short delay to get Wi-Fi set up
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    //Add the time of posting to the JSON message
+    time_t now = time(NULL);
+    char *postJSON = malloc(JSON_BUFFER_SIZE);
+    postJSON[0] = 0; //initalise first element with 0 for printing
+    sprintf(postJSON, "{\"upload_time\": \"%ld\",", now);
+    postJSON = strcat(postJSON, (char *)args);
+    ESP_LOGI("ESPNOW", "Sending JSON to backoffice: %s", postJSON);
+
+    //Post the JSON data to the backoffice
+    char response[128] = "\0";
+    int responsecode = post_https((const char *)FIXED_INTERVAL_URL, postJSON, get_root_ca(), get_bearer(), response, 128);
+    ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
+
+    //Delay to give Wi-Fi time to finish up after post
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //Free all strings from heap 
+    //TODO: Keep "args" (JSON data without timestamp) for buffering
+    free(args);
+    // free(postJSON); //Gets freed in post_https function (This should not be the case?)
+    p1ConfigSetupEspNow(); //Switch back to ESP-Now after post
+    vTaskDelete(NULL); //Self destruct
+}
+
+/**
+ * @brief Post P1 Data to the backoffice (Variable interval)
+ *
+ * @param data JSON stringified payload, typecast to void*
+ */
+void postP1backoffice(void *args) {
+    p1ConfigSetupWiFi(); //connect to Wi-Fi
+    //Short delay to get Wi-Fi set up
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    //Add the time of posting to the JSON message
+    time_t now = time(NULL);
+    char *postJSON = malloc(JSON_BUFFER_SIZE);
+    postJSON[0] = 0; //initalise first element with 0 for printing
+    //Add the time to the JSON string:
+    sprintf(postJSON, "{\"upload_time\": \"%ld\",", now);
+    //concatenate the measurements onto the timestamp
+    postJSON = strcat(postJSON, (char *)args);
+
+    //Print to terminal for debugging:
+    ESP_LOGI("ESPNOW", "Sending JSON to backoffice: %s", postJSON);
+
+    /**===Post the JSON data to the backoffice===**/
+    //create buffer to store the response
+    char response[128] = "\0";
+    //POST
+    int responsecode = post_https(VARIABLE_INTERVAL_URL, postJSON, get_root_ca(), get_bearer(), response, sizeof(response));
+    //Print response and code:
+    ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    //Free all strings from heap 
+
+    //TODO: Keep "args" (JSON data without timestamp) for buffering
+    free(args);
+    free(postJSON);
+    //Switch back to ESP-Now after post
+    p1ConfigSetupEspNow();
+
+    vTaskDelete(NULL); //Self destruct
 }

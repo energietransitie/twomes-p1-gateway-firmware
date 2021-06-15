@@ -1,5 +1,5 @@
-#ifndef _GENERIC_ESP_32_H
-#define _GENERIC_ESP_32_H
+#ifndef GENERIC_ESP_32_H
+#define GENERIC_ESP_32_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,15 +18,15 @@
 #include <esp_sntp.h>
 #include <esp_netif.h>
 #include <nvs_flash.h>
-#include <esp_netif.h>
 #include <esp_tls.h>
 #include <esp_http_client.h>
 #include <driver/gpio.h>
 
 #include <wifi_provisioning/manager.h>
-#define VERSION "V1.6.2"
+#define VERSION "V1.7.3"
 #define WIFI_RESET_BUTTON   GPIO_NUM_0
 #define LED_ERROR   GPIO_NUM_19
+#define MAX_RESPONSE_LENGTH 100
 
 #define SSID_PREFIX "TWOMES-"
 #define DEVICE_NAME_SIZE 14 /*SSID_PREFIX will be appended with six hexadecimal digits derived from the last 48 bits of the MAC address */ 
@@ -60,27 +60,27 @@ void initGPIO();
 void buttonPressDuration(void *args);
 #endif
 void blink(void *args);
-char *get_types(char *stringf, int count);
-int variable_sprintf_size(char *string, int count, ...);
+char* get_types(char* stringf, int count);
+int variable_sprintf_size(char* string, int count, ...);
 void initialize();
 void create_dat();
-void prepare_device();
+void prepare_device(const char *device_type_name);
 void time_sync_notification_cb(struct timeval *tv);
-void prov_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+void prov_event_handler(void *arg, esp_event_base_t event_base,int32_t event_id, void *event_data);
 esp_err_t http_event_handler(esp_http_client_event_t *evt);
 void wifi_init_sta(void);
 void get_device_service_name(char *service_name, size_t max);
 esp_err_t custom_prov_data_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
-    uint8_t **outbuf, ssize_t *outlen, void *priv_data);
+                                   uint8_t **outbuf, ssize_t *outlen, void *priv_data);
 void initialize_sntp(void);
-void obtain_time(int retry_count);
-void initialize_time(char *timezone);
-void post_http(const char *url, char *data, char *authenticationToken);
-char *post_https(const char *url, char *data, const char *cert, char *authenticationToken);
-void upload_heartbeat(const char *variable_interval_upload_url, const char *root_cert, char *bearer);
-char *get_bearer();
-void activate_device(const char *url, char *name, const char *cert);
-void get_http(const char *url);
+void obtain_time(void);
+void initialize_time(char* timezone);
+int post_https(const char *url, char *data, const char *cert, char *authenticationToken, char* response_buf, uint8_t resp_buf_size);
+void upload_heartbeat(const char* variable_interval_upload_url, const char* root_cert, char* bearer);
+char* get_bearer();
+const char* get_root_ca();
+void activate_device(const char *url, char *name,const char *cert);
+void get_http(const char* url);
 
 void initialize_nvs();
 

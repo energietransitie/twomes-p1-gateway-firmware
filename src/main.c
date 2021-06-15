@@ -2,7 +2,7 @@
 #define CUSTOM_IO 1
 //Generic Twomes Firmware
 #include "generic_esp_32.h"
-#include "certificate.h"
+
 //To create the JSON and read the P1 port
 #include "P1Config.h"
 #include <string.h>
@@ -16,15 +16,10 @@
 #include <wifi_provisioning/manager.h>
 
 char *bearer;
-const char *device_activation_url = TWOMES_TEST_SERVER"/device/activate";
-const char *variable_interval_upload_url = TWOMES_TEST_SERVER"/device/measurements/variable-interval";
-const char *fixed_interval_upload_url = TWOMES_TEST_SERVER"/device/measurements/fixed-interval";
 
 #define P1_READ_INTERVAL 60000 //Interval to read P1 data in milliseconds
 
-#define DEVICE_NAME "Generic-Test"
-#define HEARTBEAT_UPLOAD_INTERVAL 3600000 //ms, so one hour
-#define HEARTBEAT_MEASUREMENT_INTERVAL 600000 //ms, so 10 minutes; not yet in effect
+const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS;
 
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
@@ -49,77 +44,85 @@ void pingHeap(void *);
 void buttonPressDuration(void *args);
 void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length);
 void read_P1(void *args);
+// TODO move this to P1Config if possible:
 void postESPNOWbackoffice(void *args);
+void postP1backoffice(void *args);
 
 /* =============== MAIN ============== */
 void app_main(void) {
-    //INIT NVS and GPIO:
+    //INIT:
     initialize_nvs();
     initialize();
     initP1UART(); //Should this just be done once in main?
     initGPIO();
+
     gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
     uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from junk that might be received at boot
+
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    //Create interrupt handler task:
     xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 4096, NULL, 10, NULL, 1);
     gpio_install_isr_service(0);
+    //Attach pushbuttons to gpio ISR handler:
     gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
 
     /* Initialize TCP/IP */
     ESP_ERROR_CHECK(esp_netif_init());
 
-
-
+    //Initialise the provisioning process and Wi-Fi capabilities:
     wifi_prov_mgr_config_t config = initialize_provisioning();
-    prepare_device();
-    //Starts provisioning if not provisioned, otherwise skips provisioning.
-    //If set to false it will not autoconnect after provisioning.
-    //If set to true it will autonnect.
+    prepare_device(device_type_name);
     start_provisioning(config, true);
     //Initialize time with timezone Europe and city Amsterdam
     initialize_time("CEST");
-    //Gets time as epoch time.
     long now = time(NULL);
+
     //Log the time:
     ESP_LOGI(TAG, "%ld", now);
 
+    //Read bearer from NVS, or get it through device activation if it is not yet stored:
     bearer = get_bearer();
+    char *device_name = malloc(DEVICE_NAME_SIZE);
+    get_device_service_name(device_name, DEVICE_NAME_SIZE);
+    const char *rootCA = get_root_ca();
+
     if (strlen(bearer) > 1) {
         ESP_LOGI(TAG, "Bearer read: %s", bearer);
     }
     else if (strcmp(bearer, "") == 0) {
         ESP_LOGI(TAG, "Bearer not found, activating device!");
-        activate_device(device_activation_url, DEVICE_NAME, rootCAR3);
+        activate_device(ACTIVATION_URL, device_name, rootCA);
         bearer = get_bearer();
     }
     else if (!bearer) {
         ESP_LOGE(TAG, "Something went wrong whilst reading the bearer!");
     }
-
+    free(device_name);
     //Set to station mode for ESP-Now
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 
-    //Get the channel from NVS, if not yet stored, determine the channel and save it:
+    //Get the channel from NVS, if not yet stored, select a channel and save it:
     uint8_t espNowChannel = manageEspNowChannel();
     uint8_t wifiChannel;
     wifi_second_chan_t secondWiFiChannel;
     esp_err_t err_wifi = esp_wifi_get_channel(&wifiChannel, &secondWiFiChannel);
+
+    //Throw an error if WiFi channel could not be read:
     if (err_wifi != ESP_OK) ESP_LOGE("MAIN", "Could not read WiFi channel: %s", esp_err_to_name(err_wifi));
+
+    //Log the channel used for Wi-Fi and for ESP-Now:
     ESP_LOGI("MAIN", "Connected to WiFi on channel %u, and using channel %u for ESP-Now!", wifiChannel, espNowChannel);
-    //Check if disconnecting and reconnecting works:
+
+    //Initialise ESP-Now
     ESP_ERROR_CHECK(esp_now_init());
-    uint8_t macAddress[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, macAddress);
-    ESP_LOGI("MAC", "My MAC address is: %02X:%02X:%02X:%02X:%02X:%02X\n", macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
-
-
     //Register the ESP-Now receive callback
     esp_now_register_recv_cb(onDataReceive);
-    p1ConfigSetupEspNow(); //disable Wi-Fi and listen for ESP-Now messages
+    //Switch to the ESP-Now channel:
+    p1ConfigSetupEspNow();
 
-    //Create tasks:
+    //Create "forever running" tasks:
     xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 4096, NULL, 10, NULL, 1);
 #if defined(DEBUGHEAP)
     xTaskCreatePinnedToCore(pingHeap, "ping_Heap", 2048, NULL, 1, NULL, 1);
@@ -131,76 +134,106 @@ void app_main(void) {
 //function to read P1 port and store message in a buffer
 void read_P1(void *args) {
     while (1) {
-        uart_flush(P1PORT_UART_NUM);          //Empty the buffer before requesting data to clear it of junk
-        gpio_set_level(PIN_DRQ, 0);           //DRQ pin has inverter to pull up to 5V, which makes it active low
-        vTaskDelay(200 / portTICK_PERIOD_MS); //Give some time to let data transmit. 115200 baud with max 1kB data = max 70ms data transmission
-        gpio_set_level(PIN_DRQ, 1);           //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
+        //Empty the buffer before requesting data to clear it of junk
+        uart_flush(P1PORT_UART_NUM);
+        //DRQ pin has inverter to pull up to 5V, which makes it active low:      
+        gpio_set_level(PIN_DRQ, 0);
+        //Give some time to let data transmit. 115200 baud with max 1kB data = max 70ms data transmission           
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+        //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
+        gpio_set_level(PIN_DRQ, 1);
 
-        //Allcoate a buffer with the size of the P1 UART buffer:
+        //Allcoate a buffer with the size of the P1 UART buffer to store P1 data:
         uint8_t *data = (uint8_t *)malloc(P1_BUFFER_SIZE);
-        //Read data on UART2:
+
+        //Read data from the P1 UART:
         int len = uart_read_bytes(P1PORT_UART_NUM, data, P1_BUFFER_SIZE, 20 / portTICK_PERIOD_MS);
-        if (len > 0) { //only perform check if data is received
+        //If data is received:
+        if (len > 0) {
             //Trim the received message to contain only the necessary data and store the CRC as an unsigned int:
             char *p1MessageStart = strchr((const char *)data, '/'); //Find the position of the start-of-message character ('/')
             char *p1MessageEnd = strchr((const char *)data, '!');   //Find the position of the end-of-message character ('!')
-            //Convert the CRC from string to int:
-            unsigned int receivedCRC;
-            sscanf(p1MessageEnd + 1, "%4X", &receivedCRC); //Start the scanf one char after the end-of-message symbol, and read a 4-symbol hex number
-            uint8_t *p1Message = malloc(P1_BUFFER_SIZE);   //Allocate memory to copy the trimmed message into
-            memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
-            p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
-            free(data);                                       //Free the original read data
 
-            //Calculate the CRC of the trimmed message:
-            unsigned int calculatedCRC = CRC16(0x0000, p1Message, (int)(p1MessageEnd - p1MessageStart + 1));
-            //Check if CRC match:
-            if (calculatedCRC == receivedCRC) {
-                //log received CRC and calculated CRC for debugging
-                ESP_LOGI("P1", "Received matching CRC: (%4X == %4X)", receivedCRC, calculatedCRC);
-                ESP_LOGI("P1", "Parsing message into struct:");
-                //Create a struct for the p1 measurements
-                P1Data p1Measurements;
-                //extract the necessary data from the P1 payload into the struct and check for errors while decoding
-                int result = p1StringToStruct((const char *)p1Message, &p1Measurements);
-                ESP_LOGI("P1", "%s", p1Message);
-                ESP_LOGI("P1", "\n\nMeasurement decoded with result %i\n\n", result);
-                if (result == P1_READ_OK)
-                    printP1Data(&p1Measurements);
+            //Check if a message is received:
+            if (p1MessageEnd != NULL) {
+
+                //Convert the CRC from string to int:
+                unsigned int receivedCRC;
+                //Start the scanf one char after the end-of-message symbol (location of CRC16), and read a 4-symbol hex number
+                sscanf(p1MessageEnd + 1, "%4X", &receivedCRC);
+                //Allocate memory to copy the trimmed message into
+                uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
+                //Trim the message to only include 1 full P1 port message:
+                memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
+                p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
+
+                //Free the original read data
+                free(data);
+
+                //Calculate the CRC of the trimmed message:
+                unsigned int calculatedCRC = CRC16(0x0000, p1Message, (int)(p1MessageEnd - p1MessageStart + 1));
+
+                //Check if CRC match:
+                if (calculatedCRC == receivedCRC) {
+                    //log received CRC and calculated CRC for debugging
+                    ESP_LOGI("P1", "Received matching CRC: (%4X == %4X)", receivedCRC, calculatedCRC);
+                    ESP_LOGI("P1", "Parsing message into struct:");
+                    //Create a struct for the p1 measurements
+                    P1Data p1Measurements;
+                    //extract the necessary data from the P1 payload into the struct and check for errors while decoding
+                    int result = p1StringToStruct((const char *)p1Message, &p1Measurements);
+
+                    if (result == P1_READ_OK) {
+                        //Print the data from the struct to monitor for debugging:
+                        printP1Data(&p1Measurements);
+
+                        //put the data in the JSON string:
+                        char *p1JSON = packageP1MessageJSON(&p1Measurements);
+
+                        //Post the data to the backoffice:
+                        xTaskCreatePinnedToCore(postP1backoffice, "P1-POST", 4096, (void *)p1JSON, 10, NULL, 1);
+                    }
+                    else {
+                        //If a measurement could not be read, print to serial terminal which one was (the first that was) missing
+                        printP1Error(result);
+                        //Blink error LED twice to indicate error to user
+                        char blinkArgs[2] = { 2, LED_ERROR };
+                        xTaskCreatePinnedToCore(blink, "CRCerrorBlink", 768, (void *)blinkArgs, 10, NULL, 1);
+                    }
+                    //Start decoding the P1 message:
+                } //if(calculatedCRC == receivedCRC)
+                //if CRC does not match:
                 else {
-                    //If a measurement could not be read, print to serial terminal which one was (the first that was) missing
-                    printP1Error(result);
-                    //Blink error LED twice to indicate error to user
+                    //Log received and calculated CRC for debugging and flash the Error LED
+                    ESP_LOGI("ERROR - P1", "CRC DOES NOT MATCH");
+                    ESP_LOGI("ERROR - P1", "Received CRC %4X but calculated CRC %4X", receivedCRC, calculatedCRC);
+
+                    //Blink error LED twice
                     char blinkArgs[2] = { 2, LED_ERROR };
                     xTaskCreatePinnedToCore(blink, "CRCerrorBlink", 768, (void *)blinkArgs, 10, NULL, 1);
-                }
-                //Start decoding the P1 message:
-            } //if(calculatedCRC == receivedCRC)
-            //if CRC does not match:
-            else {
-                //Log received and calculated CRC for debugging and flash the Error LED
-                ESP_LOGI("ERROR - P1", "CRC DOES NOT MATCH");
-                ESP_LOGI("ERROR - P1", "Received CRC %4X but calculated CRC %4X", receivedCRC, calculatedCRC);
-                //Blink error LED twice
-                char blinkArgs[2] = { 2, LED_ERROR };
-                xTaskCreatePinnedToCore(blink, "CRCerrorBlink", 768, (void *)blinkArgs, 10, NULL, 1);
-            } //else (CRC check)
-            free(p1Message);
+                } //else (CRC check)
+
+                //Free the P1 message from memory
+                free(p1Message);
+            }//if(p1MessageEnd != NULL)
         }//if len>0;
-        else free(data);
-        //Free the P1 message memory
+
+        //Release the memory if a wrong message is received:
+        else {
+            free(data);
+        }//else (if(len>0))
+
+
         vTaskDelay((P1_READ_INTERVAL - 200) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
-    } //while(1)
+    } //while(1) - Never ending Task
 } //void read_P1
 
 #if defined(DEBUGHEAP)
-//Simple heartbeat print to serial monitor every 10 seconds
-//Prints size of free heap as well
+//For debugging: print the amount of free memory
 void pingHeap(void *args) {
-
     while (1) {
         ESP_LOGI("Heap", "I am alive! Free heap size: %u bytes", esp_get_free_heap_size());
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
     }
 } //void pingAlive
 #endif
@@ -215,8 +248,12 @@ void buttonPressDuration(void *args) {
     while (1) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay
+
+            //INTERRUPT HANDLER BUTTON P2
             if (io_num == BUTTON_P2) {
+                //Use half seconds to make button feel more responsive
                 uint8_t halfSeconds = 0;
+                //Check if the button is held down for over 10 seconds:
                 while (!gpio_get_level(BUTTON_P2)) {
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     halfSeconds++;
@@ -230,23 +267,25 @@ void buttonPressDuration(void *args) {
                         esp_restart();                         //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change)
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
-                    //If the button gets released before 5 seconds have passed:
+                    //If the button gets released before 10 seconds have passed:
                     else if (gpio_get_level(BUTTON_P2)) {
                         char blinkArgs[2] = { 5, LED_STATUS };
                         xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
                     }
                 } //while(!gpio_level)
             }
+
+            //INTERRUPT HANDLER BUTTON P1
             if (io_num == BUTTON_P1) {
                 uint8_t halfSeconds = 0;
+                //Long press on P1 is for clearing channel memory:
                 while (!gpio_get_level(BUTTON_P1)) {
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     halfSeconds++;
-                    if (halfSeconds == 9) {
+                    if (halfSeconds == 19) {
                         ESP_LOGI("ISR", "Button held for over 10 seconds\n");
                         char blinkArgs[2] = { 5, LED_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                        //Long press on P1 is for clearing channel memory:
                         esp_err_t err;
                         nvs_handle_t channelHandle;
                         err = nvs_open("twomes_storage", NVS_READWRITE, &channelHandle);
@@ -261,8 +300,8 @@ void buttonPressDuration(void *args) {
                             vTaskDelay(1000 / portTICK_PERIOD_MS);
                             esp_restart(); //reboot device to generate a new ESP-Now channel
                         }
-                    }                                          //if (halfSeconds == 9)
-                    //If the button gets released before 5 seconds have passed:
+                    } //if (halfSeconds == 19)
+                    //If the button gets released before 10 seconds have passed:
                     else if (gpio_get_level(BUTTON_P1)) {
                         char blinkArgs[2] = { 5, LED_STATUS };
                         xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
@@ -276,9 +315,12 @@ void buttonPressDuration(void *args) {
 
 //Callback function when receiving ESP-Now data:
 void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length) {
+
     uint8_t espnowBlinks[2] = { 2, LED_STATUS }; //Blink status LED twice on receive:
     xTaskCreatePinnedToCore(blink, "blinkESPNOW", 786, espnowBlinks, 1, NULL, 1);
     ESP_LOGI(TAG, "RECEIVED ESP_NOW MESSAGE");
+
+    //Move received data into ESP-Message struct and package to JSON
     struct ESP_message ESPNowData;
     memcpy(&ESPNowData, payload, length);
     char *measurementsJSON = packageESPNowMessageJSON(&ESPNowData);
@@ -290,47 +332,3 @@ void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length
 }
 
 
-/**
- * @brief Post ESP-Now data to the backoffice (fixed interval)
- *
- * @param data JSON stringified payload, typecast to void*
- */
-void postESPNOWbackoffice(void *args) {
-    p1ConfigSetupWiFi(); //connect to Wi-Fi
-
-    //Add the time of posting to the JSON message
-    time_t now = time(NULL);
-    char *postJSON = malloc(JSON_BUFFER_SIZE);
-    postJSON[0] = 0; //initalise first element with 0 for printing
-    sprintf(postJSON, "{\"upload_time\": \"%ld\",", now);
-    postJSON = strcat(postJSON, (char *)args);
-    ESP_LOGI("ESPNOW", "Sending JSON to backoffice: %s", postJSON);
-
-    //Post the JSON data to the backoffice
-    char *response = post_https(fixed_interval_upload_url, postJSON, rootCAR3, bearer);
-    ESP_LOGI("HTTPS", "Response: %s", response);
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-
-    //Free all strings from heap 
-    //TODO: Keep "args" (JSON data without timestamp) for buffering
-    free(args);
-    // free(postJSON); //update to generic_esp_32, https string is freed inside post_https
-    free(response);
-    p1ConfigSetupEspNow(); //Switch back to ESP-Now after post
-    vTaskDelete(NULL); //Self destruct
-}
-
-#define USE_ESPNOW 1
-// #define USE_HTTPS 1
-
-#if USE_HTTPS && !(USE_ESPNOW)
-#warning Using HTTPS mode
-//HTTPS code
-#elif USE_ESPNOW && !(USE_HTTPS)
-#warning Using ESP - Now
-//ESP-Now code
-#elif USE_HTTPS && USE_ESPNOW
-#error Please select only one communication type
-#else
-#error No communication type selected
-#endif

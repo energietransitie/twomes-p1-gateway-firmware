@@ -1,7 +1,9 @@
 #ifndef _P1CONFIG_H
 #define _P1CONFIG_H
 
-
+/**
+ * --------LIBRARIES--------
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,25 +17,28 @@
 #include <esp_wifi.h>
 #include <driver/uart.h>
 #include <driver/gpio.h>
-
 #include <esp_now.h>
 
 #include <generic_esp_32.h>
 
+ /**
+  * --------DEFINES--------
+  */
 
 #define P1CONFIG_VERSION "V0.9.0"
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #pragma message "Using P1Config version "  STR(P1CONFIG_VERSION)
 
-//Pin definitions:
+  //Pin definitions:
 #define BUTTON_P1 GPIO_NUM_0
 #define BUTTON_P2 GPIO_NUM_12
-#define LED_ERROR GPIO_NUM_22
+#define LED_ERROR GPIO_NUM_15
 #define LED_STATUS GPIO_NUM_14
 #define PIN_DRQ GPIO_NUM_17
 #define OUTPUT_BITMASK ((1ULL << LED_ERROR) | (1ULL << LED_STATUS) | (1ULL << PIN_DRQ))
 #define INPUT_BITMASK ((1ULL << BUTTON_P1) | (1ULL << BUTTON_P2))
+
 //UART defines
 #define P1_BUFFER_SIZE 1024
 #define P1PORT_UART_NUM UART_NUM_2
@@ -45,9 +50,11 @@
 //HTTP and JSON
 #define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl"
 #define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
-#define ACTIVATE_ADDRESS "/device/activate"
-#define FIXED_INTERVAL_ADDRESS "/device/measurements/fixed-interval"
-#define VARIABLE_INTERVAL_ADDRESS "/device/measurements/variable-interval"
+
+#define ACTIVATION_URL TWOMES_TEST_SERVER"/device/activate"
+#define VARIABLE_INTERVAL_URL TWOMES_TEST_SERVER"/device/measurements/variable-interval"
+#define FIXED_INTERVAL_URL TWOMES_TEST_SERVER"/device/measurements/fixed-interval"
+
 #define JSON_BUFFER_SIZE 2048
 
 //WIFI Scan
@@ -72,6 +79,15 @@ typedef struct ESP_message {
     uint8_t data[240];
 } ESP_message;
 
+//Error types for P1 data reading:
+#define P1_READ_OK 0
+#define P1_ERROR_DSMR_NOT_FOUND 1
+#define P1_ERROR_ELECUSEDT1_NOT_FOUND 2
+#define P1_ERROR_ELECUSEDT2_NOT_FOUND 3
+#define P1_ERROR_ELECRETURNT1_NOT_FOUND 4
+#define P1_ERROR_ELECRETURNT2_NOT_FOUND 5
+#define P1_ERROR_GAS_READING_NOT_FOUND 6
+#define P1_ERROR_ELEC_TIMESTAMP_NOT_FOUND 7
 //Struct for holding the P1 Data:
 typedef struct P1Data {
     uint8_t dsmrVersion;         // DSMR version without decimal point
@@ -84,20 +100,12 @@ typedef struct P1Data {
     char timeGasMeasurement[14]; // Timestamp for most recent gas measurement YY:MM:DD:HH:MM:SS And S/W for summer or winter time
 } P1Data;
 
+//For getting channel list and amount of channels:
 typedef struct channelListstruct {
     uint8_t amount;
     uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
 }channelList;
 
-//Error types for P1 data reading:
-#define P1_READ_OK 0
-#define P1_ERROR_DSMR_NOT_FOUND 1
-#define P1_ERROR_ELECUSEDT1_NOT_FOUND 2
-#define P1_ERROR_ELECUSEDT2_NOT_FOUND 3
-#define P1_ERROR_ELECRETURNT1_NOT_FOUND 4
-#define P1_ERROR_ELECRETURNT2_NOT_FOUND 5
-#define P1_ERROR_GAS_READING_NOT_FOUND 6
-#define P1_ERROR_ELEC_TIMESTAMP_NOT_FOUND 7
 
 /**
  *  ========== FUNCTIONS ================
@@ -108,30 +116,36 @@ typedef struct channelListstruct {
 void initP1UART();
 void initGPIO();
 
+
 //P1 port read and parsing
 
 unsigned int CRC16(unsigned int crc, unsigned char *buf, int len);
 int p1StringToStruct(const char *p1String, P1Data *p1Struct);
 void printP1Error(int errorType);
 
+
 //JSON
 
-char *packageESPNowMessageJSON(ESP_message *);
-char *packageP1MessageJSON(P1Data *);
+char *packageESPNowMessageJSON(ESP_message *data);
+char *packageP1MessageJSON(P1Data *data);
 void printP1Data(P1Data *data);
+
 
 //HTTPS
 
-// void postESPNOWbackoffice(void *JSONpayload);
-int postP1Databackoffice(char *JSONpayload);
+void postESPNOWbackoffice(void *args);
+void postP1backoffice(void *args);
+
 
 //Channel selection:
+
 void scanChannels();
 int compare();
 uint8_t *countChannels(channelList *channelList);
 uint8_t findMinimum(uint8_t *channelList);
 uint8_t manageEspNowChannel();
 void sendEspNowChannel(void *args);
+
 
 //Network switching
 

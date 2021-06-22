@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name TwomesGateway)(type KiCad)(uri ${KIPRJMOD}/TwomesGateway.pretty)(options "")(descr ""))
+)

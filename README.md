@@ -1,132 +1,70 @@
-# P1 Poort logger/ gateway
-Firmware for ESP32 to read and parse data from Smart meter, receive data from other measurement devices trough ESPNOW, and send all this data to the backoffice trough HTTPS POST
+# Twomes Boiler Temperature Sensor
+Firmware for the Twomes "Digital Twins for the Heat-transition" P1 port Gateway
 
-## TODO's and considerations
-* ~~Parse P1 data~~
-* ~~Use HTTP request to send data to backoffice~~
-* ~~Implement ESPNOW for monitor communication~~
-* ~~Use https instead of http~~
-* ~~Change JSON parameters to the right format~~
-* Sync RTC clock with time from smart meter readout
-* Add provisioning to exchange the WiFi credentials and unique id trough App
-* ~~Compatible for esp32 with more then 4mB flash~~
-* Use esp32 8mB flash for BLE provisioning
-* Test provisioning and port to current main software
-* Add button and LED functionality
-* Send oldest(cached/buffered) data first instead of newest
-* Improve timing/ system states
-* Variable "amount_filled_global_data_positions" is used by two cores for ESPNOW callback "OnDataRecv" and in loop to create smartmeter message. Suggest to make this failproof
-* Remove debugging code
+## Table of contents
+* [General info](#general-info)
+* [Using binary releases](#using-binaries-releases)
+* [Developing with the source code ](#developing-with-the-source-code) 
+* [Features](#features)
+* [Status](#status)
+* [License](#license)
+* [Credits](#credits)
 
-## Dependencies
-```
-#include <Arduino.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <utils.h>
-#include <espnow_settings.h>
-#include <ArduinoJson.h>
-#include <esp_now.h>
-#include <BLE.h>
-```
+## General info
+This firmware is designed to run on the ESP32 of the Twomes P1 Gateway device. It is written using C and ESP-IDF. It uses the Generic Twomes Firmware for secure HTTPS POST to the Twomes Backoffice, Twomes "Warmtewachter" provisioning and NTP timestamping.
+The firmware can read data from DSMR4 or DSMR5 Smart Energy meters and it can receive ESP-Now messages from various Twomes "Satellites".
 
-## Header files for program settings
-The files utils.h.bak and espnow_setting.h.bak contain program enviroment variables. To use the simply remove .bak from the file name and fill in the correct values
+## Using binary releases
+You can download and locally install the lastest installable version(s) via <link to the latest binary release(s) you published and describe to how people can install and run thise binaries; if needed describe this for different platforms>.
 
-## JSON formats Backoffice communication
-Smart meter
-```
-{
-    "id": "FF:FF:FF:FF:FF",
-    "dataSpec": {
-        "lastTime": "201023113050", //=2020/10/23 @ 11:30am 50 sec local time
-        "interval": 10,
-        "total": 6
-    },
-    "data": {
-        "dsmr": [
-            50
-        ],
-        "evt1": [
-            2955336
-        ],
-        "evt2": [
-            3403620
-        ],
-        "egt1": [
-            2
-        ],
-        "egt2": [
-            0
-        ],
-        "ht": [
-            2
-        ],
-        "ehv": [
-            349
-        ],
-        "ehl": [
-            0
-        ],
-        "gas": [
-            2478797
-        ],
-        "tgas": [
-            201023113008
-        ]
-    }
-}
+## Developing with the source code 
+Install [Visual Studio Code](https://code.visualstudio.com/) and the [PlatformIO](https://platformio.org/platformio-ide) plugin
 
-```
+## Features
+List of features ready and TODOs for future development. 
 
-room temperature monitor
-```
-{
-    "id": "FF:FF:FF:FF:FF",
-    "dataSpec": {
-        "lastTime": 1606915033, //=12/02/2020 @ 1:17pm (UTC)
-        "interval": 10,
-        "total": 6
-    },
-    "data": {
-        "roomTemp": [
-            20.1,
-            21.2,
-            22.3,
-            23.4,
-            24.5,
-            25.6
-        ]
-    }
-}
+Ready:
+* Receive ESP-Now data from sensors
+* Package received data into JSON
+* Receive Network Credentials through SoftAP unified provisioning
+* indicate status and error through LEDs
+* Receive user input through buttons
+* Reset provisioning when P2 (GPIO 12) is held for over 10 seconds
+* Implement Channel and MAC provisioning to sensor nodes
+* Implement P1 reading and packaging
+* HTTPS post to backoffice
+* 
+To-do:
+* Update for CO2 sensor data
+* Test with Room sensor data
+* buffer data when transmission fails
 
-```
+## Status
+Project is: in Progress.
+In its current state the software can properly receive temperatures and package them into the JSON format for twomes. The device can also read the P1 port and send the necessary data to the Twomes backoffice.
+There are still some missing features that need to be implemented, see [To-do](#features) for more info
 
-Boiler temperature monitor
-```
-{
-    "id": "FF:FF:FF:FF:FF",
-    "dataSpec": {
-        "lastTime": 1606914671, //=12/02/2020 @ 1:11pm (UTC)
-        "interval": 10,
-        "total": 6
-    },
-    "data": {
-        "pipeTemp1": [ //this should be the 'hot' outgoing pipe
-            50.1,
-            51.2,
-            52.3,
-            53.4,
-            54.5
-        ],
-        "pipeTemp2": [ //this should be the 'cold' incoming pipe
-            50.1,
-            51.2,
-            52.3,
-            53.4,
-            54.5
-        ]
-    }
-}
+## License
+This software is available under the [Apache 2.0 license](./LICENSE.md), Copyright 2021 [Research group Energy Transition, Windesheim University of Applied Sciences](https://windesheim.nl/energietransitie) 
 
-```
+## Credits
+This software is a collaborative effort the following students and researchers:
+
+For laying the ground work, see legacy branch for their contributions:
+* Fredrik-Otto Lautenbag ·  [@Fredrik1997](https://github.com/Fredrik1997)
+* Gerwin Buma ·  [@GerwinBuma](https://github.com/GerwinBuma) 
+* Werner Heetebrij ·  [@Werner-Heetebrij] (https://github.com/Werner-Heetebrij)
+* 
+Creating the new version:
+* Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
+Helping with bugfixes:
+* Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
+* Kevin Janssen · [@KevinJan18](https://github.com/KevinJan18)
+
+
+We use and gratefully aknowlegde the efforts of the makers of the following source code and libraries:
+
+* [ESP-IDF](https://github.com/espressif/esp-idf), by Espressif Systems, licensed under [Apache 2.0 License](https://github.com/espressif/esp-idf/blob/master/LICENSE)
+
+## Contact
+<not yet determined; which contact info to include here?>

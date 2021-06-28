@@ -57,9 +57,10 @@ For laying the ground work, see legacy branch for their contributions:
 * Fredrik-Otto Lautenbag ·  [@Fredrik1997](https://github.com/Fredrik1997)
 * Gerwin Buma ·  [@GerwinBuma](https://github.com/GerwinBuma) 
 * Werner Heetebrij ·  [@Werner-Heetebrij] (https://github.com/Werner-Heetebrij)
-* 
+ 
 Creating the new version:
 * Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
+
 Helping with bugfixes:
 * Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
 * Kevin Janssen · [@KevinJan18](https://github.com/KevinJan18)

@@ -1,5 +1,5 @@
-# Twomes Boiler Temperature Sensor
-Firmware for the Twomes "Digital Twins for the Heat-transition" P1 port Gateway
+# Twomes P1 Gateway measurement device
+Firmware for the Twomes P1 Gateway measurement device.
 
 ## Table of contents
 * [General info](#general-info)
@@ -11,8 +11,10 @@ Firmware for the Twomes "Digital Twins for the Heat-transition" P1 port Gateway
 * [Credits](#credits)
 
 ## General info
-This firmware is designed to run on the ESP32 of the Twomes P1 Gateway device. It is written using C and ESP-IDF. It uses the Generic Twomes Firmware for secure HTTPS POST to the Twomes Backoffice, Twomes "Warmtewachter" provisioning and NTP timestamping.
+This firmware is designed to run on the ESP32 of the Twomes P1 Gateway device. It is written using C and ESP-IDF. It uses the [Generic Firmware for Twomes measuremetn devices](https://github.com/energietransitie/twomes-generic-esp-firmware) for secure HTTPS POST to the Twomes Backoffice, Twomes "Warmtewachter" provisioning and NTP timestamping.
 The firmware can read data from DSMR4 or DSMR5 Smart Energy meters and it can receive ESP-Now messages from various Twomes "Satellites".
+
+For the associated hardware design files for the P1 Gateway hardware and enclosure and tips and instructions how to produce and assemble the hardware, please see the [twomes-p1-gateway-hardware](https://github.com/energietransitie/twomes-p1-gateway-hardware) repository. 
 
 ## Using binary releases
 Binary release not (yet) available
@@ -38,7 +40,7 @@ Ready:
 * HTTPS post to backoffice
 * 
 To-do:
-* Update for CO2 sensor data
+* Update for CO₂ sensor data
 * Test with Room sensor data
 * buffer data when transmission fails
 
@@ -51,24 +53,18 @@ There are still some missing features that need to be implemented, see [To-do](#
 This software is available under the [Apache 2.0 license](./LICENSE.md), Copyright 2021 [Research group Energy Transition, Windesheim University of Applied Sciences](https://windesheim.nl/energietransitie) 
 
 ## Credits
-This software is a collaborative effort the following students and researchers:
+This software is a collaborative effort of:
+* Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
 
-For laying the ground work, see legacy branch for their contributions:
+... with help from the following persons for laying the ground work (see legacy branch for their contributions):
 * Fredrik-Otto Lautenbag ·  [@Fredrik1997](https://github.com/Fredrik1997)
 * Gerwin Buma ·  [@GerwinBuma](https://github.com/GerwinBuma) 
 * Werner Heetebrij ·  [@Werner-Heetebrij] (https://github.com/Werner-Heetebrij)
- 
-Creating the new version:
-* Sjors Smit ·  [@Shorts1999](https://github.com/Shorts1999)
 
-Helping with bugfixes:
+... and with help from the following persons for bugfixes:
 * Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
 * Kevin Janssen · [@KevinJan18](https://github.com/KevinJan18)
 
-
 We use and gratefully aknowlegde the efforts of the makers of the following source code and libraries:
-
 * [ESP-IDF](https://github.com/espressif/esp-idf), by Espressif Systems, licensed under [Apache 2.0 License](https://github.com/espressif/esp-idf/blob/master/LICENSE)
 
-## Contact
-<not yet determined; which contact info to include here?>

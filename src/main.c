@@ -21,7 +21,6 @@ char *bearer;
 
 const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS;
 
-
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
 static const char *TAG = "Twomes P1 Gateway ESP32";
@@ -67,7 +66,7 @@ void app_main(void) {
     //Attach pushbuttons to gpio ISR handler:
     gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
-
+    
     /* Initialize TCP/IP */
     ESP_ERROR_CHECK(esp_netif_init());
 

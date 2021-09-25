@@ -1,5 +1,7 @@
 #include "P1Config.h"
 
+uint16_t wifiQueue = 0;
+
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */
@@ -167,7 +169,7 @@ char *packageESPNowMessageJSON(ESP_message *message) {
                     sprintf(measurementString, "\"%d\",", co2ppm[i]);
                     strcat(measurements, measurementString);
                 }
-            }                                                    //for(i<numberofMeasurements)
+            } //for(i<numberofMeasurements)
             char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function? (should then remove upload time insertion here...)
             sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurements);
             //HTTPS_post(stringifiedmessage);               //not yet working
@@ -261,7 +263,7 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len) {
         crc ^= (unsigned int)buf[pos]; // XOR byte into least sig. byte of crc
 
         for (int i = 8; i != 0; i--) { // Loop over each bit
-            if ((crc & 0x0001) != 0) {              // If the LSB is set
+            if ((crc & 0x0001) != 0) {// If the LSB is set
                 crc >>= 1; // Shift right and XOR 0xA001
                 crc ^= 0xA001;
             }
@@ -293,7 +295,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     char *dsmrPos = strstr(p1String, "1-3:0.2.8");
     if (dsmrPos != NULL) {
         //Read the version number:
-        sscanf(dsmrPos, "1-3:0.2.8(%hhui", &(p1Struct->dsmrVersion)); //Read DSMR version as unsigned char
+        sscanf(dsmrPos, "1-3:0.2.8(%hhu", &(p1Struct->dsmrVersion)); //Read DSMR version as unsigned char
     }
     else
         return P1_ERROR_DSMR_NOT_FOUND; //DSMR version not found
@@ -573,7 +575,11 @@ void sendEspNowChannel(void *args) {
  * @return succes status
  */
 int p1ConfigSetupWiFi() {
-    connect_wifi(); //Re-enable Wi-Fi through Generic Twomes Firmware, should automatically swap channel on connecting
+    if (wifiQueue == 0) {
+        connect_wifi(); //Re-enable Wi-Fi through Generic Twomes Firmware, should automatically swap channel on connecting
+    }
+    //Add to the Wi-Fi queue
+    wifiQueue++;
 
     // obtain_time(); //Reconnect with time server
     return 0;
@@ -586,9 +592,15 @@ int p1ConfigSetupWiFi() {
  * @return succes status
  */
 int p1ConfigSetupEspNow() {
-    disconnect_wifi(); //Disable Twomes autoconnect and disconnect from Wi-Fi
-    uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
-    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+    //Remove from Wi-Fi queue
+    wifiQueue--;
+
+    //If there are no items left in queue, turn off Wi-Fi
+    if (wifiQueue == 0) {
+        disconnect_wifi(); //Disable Twomes autoconnect and disconnect from Wi-Fi
+        uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
+        esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+    }
     return 0;
 }
 

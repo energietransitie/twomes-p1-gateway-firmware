@@ -24,7 +24,6 @@
  /**
   * --------DEFINES--------
   */
-
 #define P1CONFIG_VERSION "V0.9.0"
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
@@ -106,6 +105,8 @@ typedef struct channelListstruct {
     uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
 }channelList;
 
+/** ====== GLOBAL VARIABLES ============== */
+// uint16_t wifiQueue = 0;
 
 /**
  *  ========== FUNCTIONS ================

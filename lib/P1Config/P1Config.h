@@ -24,8 +24,7 @@
  /**
   * --------DEFINES--------
   */
-
-#define P1CONFIG_VERSION "V0.9.0"
+#define P1CONFIG_VERSION "V1.0.0"
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #pragma message "Using P1Config version "  STR(P1CONFIG_VERSION)
@@ -51,9 +50,9 @@
 #define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl"
 #define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
 
-#define ACTIVATION_URL TWOMES_TEST_SERVER"/device/activate"
-#define VARIABLE_INTERVAL_URL TWOMES_TEST_SERVER"/device/measurements/variable-interval"
-#define FIXED_INTERVAL_URL TWOMES_TEST_SERVER"/device/measurements/fixed-interval"
+#define ACTIVATION_URL TWOMES_SERVER"/device/activate"
+#define VARIABLE_INTERVAL_URL TWOMES_SERVER"/device/measurements/variable-interval"
+#define FIXED_INTERVAL_URL TWOMES_SERVER"/device/measurements/fixed-interval"
 
 #define JSON_BUFFER_SIZE 2048
 
@@ -106,6 +105,8 @@ typedef struct channelListstruct {
     uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
 }channelList;
 
+/** ====== GLOBAL VARIABLES ============== */
+// uint16_t wifiQueue = 0;
 
 /**
  *  ========== FUNCTIONS ================

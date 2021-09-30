@@ -50,13 +50,8 @@ void postP1backoffice(void *args);
 /* =============== MAIN ============== */
 void app_main(void) {
     //INIT:
-    initialize_nvs();
-    initialize();
-    initP1UART(); //Should this just be done once in main?
-    initGPIO();
-
-    gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
-    uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from junk that might be received at boot
+    initP1UART();                   //Setup P1 UART
+    initGPIO();                     //Setup GPIO
 
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -66,39 +61,13 @@ void app_main(void) {
     //Attach pushbuttons to gpio ISR handler:
     gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
-    
-    /* Initialize TCP/IP */
-    ESP_ERROR_CHECK(esp_netif_init());
 
-    //Initialise the provisioning process and Wi-Fi capabilities:
-    wifi_prov_mgr_config_t config = initialize_provisioning();
-    prepare_device(device_type_name);
-    start_provisioning(config, true);
-    //Initialize time with timezone Europe and city Amsterdam
-    initialize_time("CEST");
-    long now = time(NULL);
+    gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
+    uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from data that might be received before PIN_DRQ got pulled high
 
-    //Log the time:
-    ESP_LOGI(TAG, "%ld", now);
+    //Setup generic Firmware: V2.0.0 now contains all initialising functions inside provisioning setup
+    twomes_device_provisioning(device_type_name);
 
-    //Read bearer from NVS, or get it through device activation if it is not yet stored:
-    bearer = get_bearer();
-    char *device_name = malloc(DEVICE_NAME_SIZE);
-    get_device_service_name(device_name, DEVICE_NAME_SIZE);
-    const char *rootCA = get_root_ca();
-
-    if (strlen(bearer) > 1) {
-        ESP_LOGI(TAG, "Bearer read: %s", bearer);
-    }
-    else if (strcmp(bearer, "") == 0) {
-        ESP_LOGI(TAG, "Bearer not found, activating device!");
-        activate_device(ACTIVATION_URL, device_name, rootCA);
-        bearer = get_bearer();
-    }
-    else if (!bearer) {
-        ESP_LOGE(TAG, "Something went wrong whilst reading the bearer!");
-    }
-    free(device_name);
     //Set to station mode for ESP-Now
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 

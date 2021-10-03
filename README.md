@@ -24,7 +24,7 @@ For the associated hardware design files for the P1 Gateway hardware and enclosu
 *	[Esptool](https://github.com/espressif/esptool) installed, the Espressif SoC serial bootloader utility;
 *	[PuTTY](https://www.chiark.greenend.org.uk/~sgtatham/putty/), a serial monitor utility. (If your you're also developing, you may use the serial monitor utility in your IDE, instead).
 
-###how to upload firmware
+### how to upload firmware
 
 Connect a USB<->Serial converter to the 6 holes next to the ESP32 on the P1 Gateway, the pinout is described on the bottom of the device. 
 (optional) Connect the USB power port on the P1 Gateway to supply it with power, this is more stable than the power supplied through the programmer

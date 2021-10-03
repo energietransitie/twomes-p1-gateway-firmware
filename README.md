@@ -29,9 +29,11 @@ For the associated hardware design files for the P1 Gateway hardware and enclosu
 Connect a USB<->Serial converter to the 6 holes next to the ESP32 on the P1 Gateway, the pinout is described on the bottom of the device. 
 (optional) Connect the USB power port on the P1 Gateway to supply it with power, this is more stable than the power supplied through the programmer
 
-###On windows:
+### On windows:
 Run UPLOAD.bat 
-###On Linux/Mac
+
+
+### On Linux/Mac
 Run the following command on the _command line_:
 	```shell
 	py -m esptool --chip esp32 --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x8000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin  

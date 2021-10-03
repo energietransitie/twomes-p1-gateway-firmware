@@ -30,11 +30,14 @@ Ready:
 * indicate status and error through LEDs
 * Receive user input through buttons
 * Reset provisioning when P2 (GPIO 12) is held for over 5 seconds
-
-To-do:
 * Implement Channel and MAC provisioning to sensor nodes
 * Implement P1 reading and packaging
 * HTTPS post to backoffice
+
+To-do:
+* improve stability
+* Add support for CO2 sensor messages
+
 
 ## Status
 Project is: in Progress.

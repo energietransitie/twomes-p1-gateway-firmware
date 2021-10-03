@@ -18,8 +18,7 @@ For the associated hardware design files for the P1 Gateway hardware and enclosu
 
 ## Using binary releases
 ### Prerequisites
-*	a device based on an ESP32 SoC, such as the [LilyGO TTGO T7 Mini32 V1.3 ESP32](https://github.com/LilyGO/ESP32-MINI-32-V1.3) or an ESP8266 SoC, such as the [Wemos LOLIN D1 mini](https://www.wemos.cc/en/latest/d1/d1_mini.html);
-*	a USB to micro-USB cable;
+*	a USB to Serial programmer (FTDI, CP210x, etc..);
 *	a PC with a USB port;
 *	[Python v3.8 or above](https://www.python.org/downloads/) installed, and make sure to select `Add Python <version number> to PATH` so you can use the Python commands we document below from a command prompt;
 *	[Esptool](https://github.com/espressif/esptool) installed, the Espressif SoC serial bootloader utility;

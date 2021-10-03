@@ -150,7 +150,7 @@ char *packageESPNowMessageJSON(ESP_message *message) {
                 "\"interval\":%u,"
                 "\"measurements\":[%s]}]}";
             long now = time(NULL); //Get current time
-            ESP_LOGI("JSON", "Received ROOMTEMP, containing %d measurements\n", message->numberofMeasurements);
+            ESP_LOGI("JSON", "Received CO2, containing %d measurements\n", message->numberofMeasurements);
             char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
             measurements[0] = 0;                             //initialise 0 on first element of array to indicate start of string
             uint16_t co2ppm[120];
@@ -167,7 +167,7 @@ char *packageESPNowMessageJSON(ESP_message *message) {
                     sprintf(measurementString, "\"%d\",", co2ppm[i]);
                     strcat(measurements, measurementString);
                 }
-            }                                                    //for(i<numberofMeasurements)
+            } //for(i<numberofMeasurements)
             char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function? (should then remove upload time insertion here...)
             sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurements);
             //HTTPS_post(stringifiedmessage);               //not yet working
@@ -261,7 +261,7 @@ unsigned int CRC16(unsigned int crc, unsigned char *buf, int len) {
         crc ^= (unsigned int)buf[pos]; // XOR byte into least sig. byte of crc
 
         for (int i = 8; i != 0; i--) { // Loop over each bit
-            if ((crc & 0x0001) != 0) {              // If the LSB is set
+            if ((crc & 0x0001) != 0) {// If the LSB is set
                 crc >>= 1; // Shift right and XOR 0xA001
                 crc ^= 0xA001;
             }
@@ -293,7 +293,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     char *dsmrPos = strstr(p1String, "1-3:0.2.8");
     if (dsmrPos != NULL) {
         //Read the version number:
-        sscanf(dsmrPos, "1-3:0.2.8(%hhui", &(p1Struct->dsmrVersion)); //Read DSMR version as unsigned char
+        sscanf(dsmrPos, "1-3:0.2.8(%hhu", &(p1Struct->dsmrVersion)); //Read DSMR version as unsigned char
     }
     else
         return P1_ERROR_DSMR_NOT_FOUND; //DSMR version not found
@@ -570,15 +570,17 @@ void sendEspNowChannel(void *args) {
 /**
  * @brief turn off Wi-Fi capabilities and switch to the ESP-Now channel
  *
+ * @param reason string for task name to help debugging
+ *
  * @return succes status
  */
-int p1ConfigSetupWiFi() {
-    connect_wifi(); //Re-enable Wi-Fi through Generic Twomes Firmware, should automatically swap channel on connecting
-
-    // obtain_time(); //Reconnect with time server
+int p1ConfigSetupWiFi(char *reason) {
+    //Re-enable Wi-Fi through Generic Twomes Firmware, should automatically swap channel on connecting
+    if (enable_wifi(reason)) {
+        connect_wifi();
+    }
     return 0;
 }
-
 
 /**
  * @brief turn off ESP-now capabilities and connect to Wi-Fi
@@ -586,7 +588,12 @@ int p1ConfigSetupWiFi() {
  * @return succes status
  */
 int p1ConfigSetupEspNow() {
-    disconnect_wifi(); //Disable Twomes autoconnect and disconnect from Wi-Fi
+    enable_wifi("ESP-Now");
+    vTaskDelay(1000 / portTICK_PERIOD_MS); //Give second for Wifi to enable
+    xSemaphoreGive(wireless_802_11_mutex);
+    disconnect_wifi();
+    //disable_wifi("Listen ESP-Now"); //Disable Twomes autoconnect and disconnect from Wi-Fi
+    vTaskDelay(500 / portTICK_PERIOD_MS); //Give time for Wi-Fi to disconnect
     uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
     return 0;
@@ -598,7 +605,7 @@ int p1ConfigSetupEspNow() {
  * @param data JSON stringified payload, typecast to void*
  */
 void postESPNOWbackoffice(void *args) {
-    p1ConfigSetupWiFi(); //connect to Wi-Fi
+    p1ConfigSetupWiFi("ESP-Now message POST"); //connect to Wi-Fi
     //Short delay to get Wi-Fi set up
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -611,8 +618,8 @@ void postESPNOWbackoffice(void *args) {
     ESP_LOGI("ESPNOW", "Sending JSON to backoffice: %s", postJSON);
 
     //Post the JSON data to the backoffice
-    char response[128] = "\0";
-    int responsecode = post_https((const char *)FIXED_INTERVAL_URL, postJSON, get_root_ca(), get_bearer(), response, 128);
+    char response[128] = "";
+    int responsecode = post_https((const char *)FIXED_INTERVAL_URL, postJSON, response, sizeof response);
     ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
 
     //Delay to give Wi-Fi time to finish up after post
@@ -631,7 +638,7 @@ void postESPNOWbackoffice(void *args) {
  * @param data JSON stringified payload, typecast to void*
  */
 void postP1backoffice(void *args) {
-    p1ConfigSetupWiFi(); //connect to Wi-Fi
+    p1ConfigSetupWiFi("P1 data POST"); //connect to Wi-Fi
     //Short delay to get Wi-Fi set up
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -651,7 +658,7 @@ void postP1backoffice(void *args) {
     //create buffer to store the response
     char response[128] = "\0";
     //POST
-    int responsecode = post_https(VARIABLE_INTERVAL_URL, postJSON, get_root_ca(), get_bearer(), response, sizeof(response));
+    int responsecode = post_https(VARIABLE_INTERVAL_URL, postJSON, response, sizeof(response));
     //Print response and code:
     ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
     vTaskDelay(1000 / portTICK_PERIOD_MS);

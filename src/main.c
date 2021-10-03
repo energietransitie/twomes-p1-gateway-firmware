@@ -15,7 +15,6 @@
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 
-char *bearer;
 
 #define P1_READ_INTERVAL 60000 //Interval to read P1 data in milliseconds
 
@@ -34,7 +33,6 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 } //gpio_isr_handler
 
-
 //Functions:
 #if defined(DEBUGHEAP)
 void pingHeap(void *);
@@ -46,17 +44,13 @@ void read_P1(void *args);
 // TODO move this to P1Config if possible:
 void postESPNOWbackoffice(void *args);
 void postP1backoffice(void *args);
+void espnow_available_task(void *args);
 
 /* =============== MAIN ============== */
 void app_main(void) {
     //INIT:
-    initialize_nvs();
-    initialize();
-    initP1UART(); //Should this just be done once in main?
-    initGPIO();
-
-    gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
-    uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from junk that might be received at boot
+    initP1UART();                   //Setup P1 UART
+    initGPIO();                     //Setup GPIO
 
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -66,39 +60,13 @@ void app_main(void) {
     //Attach pushbuttons to gpio ISR handler:
     gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
-    
-    /* Initialize TCP/IP */
-    ESP_ERROR_CHECK(esp_netif_init());
 
-    //Initialise the provisioning process and Wi-Fi capabilities:
-    wifi_prov_mgr_config_t config = initialize_provisioning();
-    prepare_device(device_type_name);
-    start_provisioning(config, true);
-    //Initialize time with timezone Europe and city Amsterdam
-    initialize_time("CEST");
-    long now = time(NULL);
+    gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
+    uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from data that might be received before PIN_DRQ got pulled high
 
-    //Log the time:
-    ESP_LOGI(TAG, "%ld", now);
+    //Setup generic Firmware: V2.0.0 now contains all initialising functions inside provisioning setup
+    twomes_device_provisioning(device_type_name);
 
-    //Read bearer from NVS, or get it through device activation if it is not yet stored:
-    bearer = get_bearer();
-    char *device_name = malloc(DEVICE_NAME_SIZE);
-    get_device_service_name(device_name, DEVICE_NAME_SIZE);
-    const char *rootCA = get_root_ca();
-
-    if (strlen(bearer) > 1) {
-        ESP_LOGI(TAG, "Bearer read: %s", bearer);
-    }
-    else if (strcmp(bearer, "") == 0) {
-        ESP_LOGI(TAG, "Bearer not found, activating device!");
-        activate_device(ACTIVATION_URL, device_name, rootCA);
-        bearer = get_bearer();
-    }
-    else if (!bearer) {
-        ESP_LOGE(TAG, "Something went wrong whilst reading the bearer!");
-    }
-    free(device_name);
     //Set to station mode for ESP-Now
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 
@@ -114,15 +82,17 @@ void app_main(void) {
     //Log the channel used for Wi-Fi and for ESP-Now:
     ESP_LOGI("MAIN", "Connected to WiFi on channel %u, and using channel %u for ESP-Now!", wifiChannel, espNowChannel);
 
-    //Initialise ESP-Now
-    ESP_ERROR_CHECK(esp_now_init());
-    //Register the ESP-Now receive callback
-    esp_now_register_recv_cb(onDataReceive);
-    //Switch to the ESP-Now channel:
-    p1ConfigSetupEspNow();
+
 
     //Create "forever running" tasks:
-    xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 4096, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 16384, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(&heartbeat_task, "twomes_heartbeat", 16384, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(espnow_available_task, "espnow_poll", 4096, NULL, 12, NULL, 1);
+    ESP_LOGI(TAG, "Waiting 5  seconds before initiating next measurement intervals");
+    vTaskDelay(5000 / portTICK_PERIOD_MS); // wait 5 seconds before initiating next measurement intervals
+
+    ESP_LOGI(TAG, "Starting timesync task");
+    xTaskCreatePinnedToCore(&timesync_task, "timesync_task", 4096, NULL, 1, NULL, 1);
 #if defined(DEBUGHEAP)
     xTaskCreatePinnedToCore(pingHeap, "ping_Heap", 2048, NULL, 1, NULL, 1);
 #endif
@@ -330,4 +300,43 @@ void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length
     ESP_LOGI("ESPNOW", "ESP-Now Callback ended"); //check if callback ends after creating task
 }
 
+/**
+ * @brief poll 802_11 semaphore to see if resource is available
+ * release semaphore after taking to
+ */
+void espnow_available_task(void *args) {
+    bool espNowIsEnabled = false;
+    while (1) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        //if esp-Now is off and the semaphore is available, turn on ESP-Now:
+        if (!espNowIsEnabled) {
+            if (xSemaphoreTake(wireless_802_11_mutex, 10 / portTICK_PERIOD_MS)) {
+                xSemaphoreGive(wireless_802_11_mutex);
+                ESP_LOGI("ESP-NOW", "Taking semaphore and enabling ESP-Now");
+                p1ConfigSetupEspNow();
+                //Initialise ESP-Now
+                ESP_ERROR_CHECK(esp_now_init());
+                //Register the ESP-Now receive callback
+                esp_now_register_recv_cb(onDataReceive);
+                //Switch to the ESP-Now channel:
+                espNowIsEnabled = true;
+                //Release semaphore so that more important tasks can take the resources if they need it:
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
+            else ESP_LOGI("ESP-Now", "Semaphore was not available");
+        }
+        //If semaphore is taken and espNow is enabled, deinit esp-now to ensure no data collisions (already should not happen, but just in case?)
+        if (espNowIsEnabled) {
+            if (xSemaphoreTake(wireless_802_11_mutex, 10 / portTICK_PERIOD_MS)) {
+                xSemaphoreGive(wireless_802_11_mutex);
+            }
+            else {
+                ESP_LOGI("ESP-NOW", "Sempahore is taken, releasing resources, disabling ESP-Now");
+                esp_now_unregister_recv_cb();
+                esp_now_deinit();
+                espNowIsEnabled = false;
+            }
 
+        }
+    }
+}

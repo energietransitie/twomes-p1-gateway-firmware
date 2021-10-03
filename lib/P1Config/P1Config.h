@@ -24,8 +24,7 @@
  /**
   * --------DEFINES--------
   */
-
-#define P1CONFIG_VERSION "V0.9.0"
+#define P1CONFIG_VERSION "V1.0.0"
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #pragma message "Using P1Config version "  STR(P1CONFIG_VERSION)
@@ -49,11 +48,11 @@
 
 //HTTP and JSON
 #define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl"
-#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
+#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"A
 
-#define ACTIVATION_URL TWOMES_TEST_SERVER"/device/activate"
-#define VARIABLE_INTERVAL_URL TWOMES_TEST_SERVER"/device/measurements/variable-interval"
-#define FIXED_INTERVAL_URL TWOMES_TEST_SERVER"/device/measurements/fixed-interval"
+#define ACTIVATION_URL TWOMES_SERVER"/device/activate"
+#define VARIABLE_INTERVAL_URL "/device/measurements/variable-interval"
+#define FIXED_INTERVAL_URL "/device/measurements/fixed-interval"
 
 #define JSON_BUFFER_SIZE 2048
 
@@ -106,6 +105,23 @@ typedef struct channelListstruct {
     uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
 }channelList;
 
+//Data type intervals:
+//Boiler    - 3m20s
+//HB        - 10m
+//Roomtemp  - 
+//Co2       - 
+//P1        - 
+//Presence  - 
+#define INTERVAL_BOILER     200 //3m20
+#define INTERVAL_ROOM           
+#define INTERVAL_CO2            
+#define INTERVAL_HB        3600 //1 hour
+#define INTERVAL_PRESENCE   300 //5m
+#define INTERVAL_P1         900 //15min
+
+
+/** ====== GLOBAL VARIABLES ============== */
+// uint16_t wifiQueue = 0;
 
 /**
  *  ========== FUNCTIONS ================

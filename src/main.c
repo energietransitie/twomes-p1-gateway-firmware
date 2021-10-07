@@ -16,7 +16,7 @@
 #include <wifi_provisioning/manager.h>
 
 
-#define P1_READ_INTERVAL 60000 //Interval to read P1 data in milliseconds
+#define P1_READ_INTERVAL 10 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
 
 const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS;
 
@@ -60,6 +60,10 @@ void app_main(void) {
     //Attach pushbuttons to gpio ISR handler:
     gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
+    while (gpio_get_level(BUTTON_P2)) {
+        ESP_LOGI("test", "HELP I CRASHED, PRESS P2 TO BOOT ME!");
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    }
 
     gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
     uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from data that might be received before PIN_DRQ got pulled high
@@ -86,8 +90,8 @@ void app_main(void) {
 
     //Create "forever running" tasks:
     xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 16384, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(&heartbeat_task, "twomes_heartbeat", 16384, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(espnow_available_task, "espnow_poll", 4096, NULL, 12, NULL, 1);
+    xTaskCreatePinnedToCore(&heartbeat_task, "twomes_heartbeat", 16384, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(espnow_available_task, "espnow_poll", 4096, NULL, 11, NULL, 1);
     ESP_LOGI(TAG, "Waiting 5  seconds before initiating next measurement intervals");
     vTaskDelay(5000 / portTICK_PERIOD_MS); // wait 5 seconds before initiating next measurement intervals
 
@@ -105,6 +109,7 @@ void read_P1(void *args) {
     while (1) {
         //Empty the buffer before requesting data to clear it of junk
         uart_flush(P1PORT_UART_NUM);
+        ESP_LOGI("P1", "Attempting to read P1 Port");
         //DRQ pin has inverter to pull up to 5V, which makes it active low:      
         gpio_set_level(PIN_DRQ, 0);
         //Give some time to let data transmit. 115200 baud with max 1kB data = max 70ms data transmission           
@@ -202,7 +207,7 @@ void read_P1(void *args) {
 void pingHeap(void *args) {
     while (1) {
         ESP_LOGI("Heap", "I am alive! Free heap size: %u bytes", esp_get_free_heap_size());
-        vTaskDelay(30000 / portTICK_PERIOD_MS);
+        vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
 } //void pingAlive
 #endif
@@ -311,21 +316,20 @@ void espnow_available_task(void *args) {
         //if esp-Now is off and the semaphore is available, turn on ESP-Now:
         if (!espNowIsEnabled) {
             if (xSemaphoreTake(wireless_802_11_mutex, 10 / portTICK_PERIOD_MS)) {
-                xSemaphoreGive(wireless_802_11_mutex);
                 ESP_LOGI("ESP-NOW", "Taking semaphore and enabling ESP-Now");
+                //SetupEsPNow() also releases Semaphore:
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                ESP_ERROR_CHECK(esp_now_init());
+                esp_now_register_recv_cb(onDataReceive);
                 p1ConfigSetupEspNow();
                 //Initialise ESP-Now
-                ESP_ERROR_CHECK(esp_now_init());
                 //Register the ESP-Now receive callback
-                esp_now_register_recv_cb(onDataReceive);
                 //Switch to the ESP-Now channel:
                 espNowIsEnabled = true;
-                //Release semaphore so that more important tasks can take the resources if they need it:
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
             }
             else ESP_LOGI("ESP-Now", "Semaphore was not available");
         }
-        //If semaphore is taken and espNow is enabled, deinit esp-now to ensure no data collisions (already should not happen, but just in case?)
+        //If semaphore is taken and ESP-Now is enabled, deinit esp-now to ensure no data collisions (already should not happen, but just in case?)
         if (espNowIsEnabled) {
             if (xSemaphoreTake(wireless_802_11_mutex, 10 / portTICK_PERIOD_MS)) {
                 xSemaphoreGive(wireless_802_11_mutex);

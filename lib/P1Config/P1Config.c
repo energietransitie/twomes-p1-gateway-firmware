@@ -543,7 +543,7 @@ uint8_t manageEspNowChannel() {
 void sendEspNowChannel(void *args) {
     uint8_t channel = manageEspNowChannel(); //Get channel from NVS, should this be given as a param from RAM?
 
-    disconnect_wifi(); //Disable the Generic Twomes Auto-Connect feature, to allow channel switching
+    disconnect_wifi("ESP-Now send pairing info"); //Disable the Generic Twomes Auto-Connect feature, to allow channel switching
     esp_now_init(); //Initialise ESP-Now
 
     //Set the channel to the channel devices use for pairing:
@@ -576,10 +576,8 @@ void sendEspNowChannel(void *args) {
  */
 int p1ConfigSetupWiFi(char *reason) {
     //Re-enable Wi-Fi through Generic Twomes Firmware, should automatically swap channel on connecting
-    if (enable_wifi(reason)) {
-        connect_wifi();
-    }
-    return 0;
+    if (connect_wifi(reason)) return 0;
+    return -1;
 }
 
 /**
@@ -588,15 +586,13 @@ int p1ConfigSetupWiFi(char *reason) {
  * @return succes status
  */
 int p1ConfigSetupEspNow() {
-    enable_wifi("ESP-Now");
-    vTaskDelay(1000 / portTICK_PERIOD_MS); //Give second for Wifi to enable
-    xSemaphoreGive(wireless_802_11_mutex);
-    disconnect_wifi();
-    //disable_wifi("Listen ESP-Now"); //Disable Twomes autoconnect and disconnect from Wi-Fi
-    vTaskDelay(500 / portTICK_PERIOD_MS); //Give time for Wi-Fi to disconnect
-    uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
-    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-    return 0;
+    if (disconnect_wifi("ESP-Now listen")) {
+        vTaskDelay(500 / portTICK_PERIOD_MS); //Give time for Wi-Fi to disconnect
+        uint8_t channel = manageEspNowChannel(); //Get the channel from NVS
+        esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+        return 0;
+    }
+    else return -1;
 }
 
 /**
@@ -619,7 +615,7 @@ void postESPNOWbackoffice(void *args) {
 
     //Post the JSON data to the backoffice
     char response[128] = "";
-    int responsecode = post_https((const char *)FIXED_INTERVAL_URL, postJSON, response, sizeof response);
+    int responsecode = upload_data_to_server((const char *)FIXED_INTERVAL_URL, POST_WITH_BEARER, postJSON, response, sizeof response);
     ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
 
     //Delay to give Wi-Fi time to finish up after post
@@ -627,8 +623,8 @@ void postESPNOWbackoffice(void *args) {
     //Free all strings from heap 
     //TODO: Keep "args" (JSON data without timestamp) for buffering
     free(args);
-    // free(postJSON); //Gets freed in post_https function (This should not be the case?)
-    p1ConfigSetupEspNow(); //Switch back to ESP-Now after post
+    free(postJSON); //Gets freed in post_https function (This should not be the case?)
+    disconnect_wifi("Post ESP-Now data");
     vTaskDelete(NULL); //Self destruct
 }
 
@@ -638,7 +634,7 @@ void postESPNOWbackoffice(void *args) {
  * @param data JSON stringified payload, typecast to void*
  */
 void postP1backoffice(void *args) {
-    p1ConfigSetupWiFi("P1 data POST"); //connect to Wi-Fi
+    p1ConfigSetupWiFi("Post P1 Data"); //connect to Wi-Fi
     //Short delay to get Wi-Fi set up
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -658,7 +654,7 @@ void postP1backoffice(void *args) {
     //create buffer to store the response
     char response[128] = "\0";
     //POST
-    int responsecode = post_https(VARIABLE_INTERVAL_URL, postJSON, response, sizeof(response));
+    int responsecode = upload_data_to_server(VARIABLE_INTERVAL_URL, POST_WITH_BEARER, postJSON, response, sizeof(response));
     //Print response and code:
     ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -669,7 +665,7 @@ void postP1backoffice(void *args) {
     free(args);
     free(postJSON);
     //Switch back to ESP-Now after post
-    p1ConfigSetupEspNow();
+    disconnect_wifi("Post P1 data");
 
     vTaskDelete(NULL); //Self destruct
 }

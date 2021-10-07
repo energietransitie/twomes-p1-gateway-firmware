@@ -41,8 +41,11 @@
 
 #define LONG_BUTTON_PRESS_DURATION 10 // seconds
 
-#define HTTPS_PRE_WAIT_MS (5 * 1000) // milliseconds ( 1,5 s * 1000 ms/s)
-#define HTTPS_RETRY_WAIT_MS (1 * 1000) // milliseconds ( 2 s * 1000 ms/s)  
+#define POST_WITH_BEARER true
+#define POST_WITHOUT_BEARER false
+
+#define HTTPS_PRE_WAIT_MS (1.5 * 1000) // milliseconds ( 1,5 s * 1000 ms/s)
+#define HTTPS_RETRY_WAIT_MS (2 * 1000) // milliseconds ( 2 s * 1000 ms/s)  
 #define HTTPS_POST_WAIT_MS (1 * 1000) // milliseconds ( 1 s * 1000 ms/s)
 #define HTTPS_UPLOAD_RETRIES 10 // number of retries inclusing initial try  
 #define NTP_RETRIES 10 // // number of retries for timesync inclusing initial try
@@ -108,7 +111,7 @@ void obtain_time(void);
 void timesync_task(void *data);
 void timesync();
 void initialize_timezone(char *timezone);
-int post_https(const char *endpoint, char *data, char *response_buf, uint8_t resp_buf_size);
+int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
 void upload_heartbeat(int hbcounter);
 void heartbeat_task(void *data);
 char *get_bearer();
@@ -123,8 +126,8 @@ void initialize_nvs();
 wifi_prov_mgr_config_t initialize_provisioning();
 void start_provisioning(wifi_prov_mgr_config_t config, bool connect);
 void twomes_device_provisioning(const char *device_type_name);
-void disable_wifi(char *taskString);
+bool disable_wifi(char *taskString);
 bool enable_wifi(char *taskString);
-void disconnect_wifi();
-void connect_wifi();
+bool disconnect_wifi(char *taskString);
+bool connect_wifi(char *taskString);
 #endif

@@ -60,10 +60,7 @@ void app_main(void) {
     //Attach pushbuttons to gpio ISR handler:
     gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
     gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
-    while (gpio_get_level(BUTTON_P2)) {
-        ESP_LOGI("test", "HELP I CRASHED, PRESS P2 TO BOOT ME!");
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
-    }
+
 
     gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
     uart_flush_input(P1PORT_UART_NUM); //Empty the buffer from data that might be received before PIN_DRQ got pulled high

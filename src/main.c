@@ -220,37 +220,36 @@ void buttonPressDuration(void *args) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay
 
-            //INTERRUPT HANDLER BUTTON P2
-            if (io_num == BUTTON_P2) {
+            //INTERRUPT HANDLER BUTTON P1
+            if (io_num == BUTTON_P1) {
                 //Use half seconds to make button feel more responsive
                 uint8_t halfSeconds = 0;
                 //Check if the button is held down for over 10 seconds:
-                while (!gpio_get_level(BUTTON_P2)) {
+                while (!gpio_get_level(BUTTON_P1)) {
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     halfSeconds++;
                     if (halfSeconds == 19) {
                         ESP_LOGI("ISR", "Button held for over 10 seconds\n");
                         char blinkArgs[2] = { 5, LED_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                        //Long press on P2 is for clearing provisioning memory:
+                        //Long press on P1 is for clearing provisioning memory:
                         esp_wifi_restore();
                         vTaskDelay(1000 / portTICK_PERIOD_MS); //Wait for blink to finish
                         esp_restart();                         //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change)
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
                     //If the button gets released before 10 seconds have passed:
-                    else if (gpio_get_level(BUTTON_P2)) {
+                    else if (gpio_get_level(BUTTON_P1)) {
                         char blinkArgs[2] = { 5, LED_STATUS };
                         xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
                     }
                 } //while(!gpio_level)
             }
-
-            //INTERRUPT HANDLER BUTTON P1
-            if (io_num == BUTTON_P1) {
+            //INTERRUPT HANDLER BUTTON P2
+            if (io_num == BUTTON_P2) {
                 uint8_t halfSeconds = 0;
                 //Long press on P1 is for clearing channel memory:
-                while (!gpio_get_level(BUTTON_P1)) {
+                while (!gpio_get_level(BUTTON_P2)) {
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     halfSeconds++;
                     if (halfSeconds == 19) {
@@ -273,7 +272,7 @@ void buttonPressDuration(void *args) {
                         }
                     } //if (halfSeconds == 19)
                     //If the button gets released before 10 seconds have passed:
-                    else if (gpio_get_level(BUTTON_P1)) {
+                    else if (gpio_get_level(BUTTON_P2)) {
                         char blinkArgs[2] = { 5, LED_STATUS };
                         xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
                         xTaskCreatePinnedToCore(sendEspNowChannel, "pair_sensor", 2048, NULL, 15, NULL, 1); //Send data in relatively high priority task

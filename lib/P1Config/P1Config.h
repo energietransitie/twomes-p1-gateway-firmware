@@ -45,10 +45,12 @@
 //DeviceTypes
 #define DEVICETYPE_P1_ONLY "DSMR-P1-gateway"
 #define DEVICETYPE_P1_WITH_SENSORS "DSMR-P1-gateway-TinTsTr"
+#define DEVICETYPE_P1_WITH_SENSORS_AND_CO2 "DSMR-P1-gateway-TinTsTrCO2"
+#define DEVICETYPE_P1_WITH_CO2 "DSMR-P1-gateway-TinCO2"
 
 //HTTP and JSON
 #define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl"
-#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"A
+#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
 
 #define ACTIVATION_URL TWOMES_SERVER"/device/activate"
 #define VARIABLE_INTERVAL_URL "/device/measurements/variable-interval"
@@ -77,6 +79,35 @@ typedef struct ESP_message {
     uint16_t intervalTime;        //Interval between measurements, for timestamping
     uint8_t data[240];
 } ESP_message;
+
+//MEASUREMENT TYPE STRUCTS:
+#define MAX_BOILER_SAMPLES 60
+typedef struct Boiler_message {
+    uint8_t measurementType;  //Type of measurements
+    uint8_t numberofMeasurements;                       //number of measurements in burst
+    uint16_t index;                                     //Number identifying the message, only increments on receiving an ACK from Gateway. Could be uint8_t since overflows are ignored?
+    uint16_t intervalTime;               //Interval between measurements, for timestamping in gateway
+    int16_t pipeTemps1[MAX_BOILER_SAMPLES];             //measurements of the first temperature sensor
+    int16_t pipeTemps2[MAX_BOILER_SAMPLES];             //measurements of the second temperature sensor
+} Boiler_message;
+#define MAX_TEMP_SAMPLES 120
+typedef struct Roomtemp_Message {
+    uint8_t measurementType;                            //Type of measurements
+    uint8_t numberofMeasurements;                       //number of measurements in burst
+    uint16_t index;                                     //Number identifying the message, only increments on receiving an ACK from Gateway. Could be uint8_t since overflows are ignored?
+    uint16_t intervalTime;                              //Interval between measurements, for timestamping in gateway
+    int16_t roomTemps[MAX_TEMP_SAMPLES];                //measurements of the Si7051
+} Roomtemp_Message;
+#define MAX_CO2_SAMPLES 40
+typedef struct CO2_Message {
+    uint8_t measurementType;                            //Type of measurements
+    uint8_t numberofMeasurements;                       //number of measurements in burst
+    uint16_t index;                                     //Number identifying the message, only increments on receiving an ACK from Gateway. Could be uint8_t since overflows are ignored?
+    uint16_t intervalTime;                              //Interval between measurements, for timestamping in gateway
+    int16_t co2ppm[MAX_CO2_SAMPLES];                    //measurements of the CO2 concentration
+    int16_t co2temp[MAX_CO2_SAMPLES];                   //measurements of the temperature by SCD41
+    int16_t co2humid[MAX_CO2_SAMPLES];                  //measurements of the humidity
+} CO2_Message;
 
 //Error types for P1 data reading:
 #define P1_READ_OK 0

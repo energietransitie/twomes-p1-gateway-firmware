@@ -1,5 +1,5 @@
 #include "P1Config.h"
-
+#define LOG_LOCAL_LEVEL 4
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */
@@ -115,7 +115,7 @@ char *packageESPNowMessageJSON(ESP_message *message) {
             ESP_LOGI("JSON", "Received ROOMTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
             {                                                    //Place in scope to free stack after post
-                char measurements[(8 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
+                char measurements[(8 * MAX_TEMP_SAMPLES) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
                 uint8_t i;
                 measurements[0] = 0; //initialise 0 on first element of array to indicate start of string
                 uint16_t roomTemps[120];
@@ -123,14 +123,12 @@ char *packageESPNowMessageJSON(ESP_message *message) {
                 for (i = 0; i < message->numberofMeasurements; i++) {
                     if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
                         char measurementString[9];
-                        //Currently using conversion of DS18B20 RAW temperature! (No SI7051 support yet!)
-                        sprintf(measurementString, "\"%2.2f\"", ((float)((roomTemps[i]) * 0.0078125f)));
+                        sprintf(measurementString, "\"%2.2f\"", ((float)(((175.72f) * roomTemps[i]) / 65536) - 46.85f));
                         strcat(measurements, measurementString);
                     }
                     else {
                         char measurementString[9];
-                        //Currently using conversion of DS18B20 RAW temperature! (No SI7051 support yet!)
-                        sprintf(measurementString, "\"%2.2f\",", ((float)((roomTemps[i]) * 0.0078125f)));
+                        sprintf(measurementString, "\"%2.2f\",", ((float)(((175.72f) * roomTemps[i]) / 65536) - 46.85f));
                         strcat(measurements, measurementString);
                     }
                 }                                                    //for(i<numberofMeasurements)
@@ -143,33 +141,79 @@ char *packageESPNowMessageJSON(ESP_message *message) {
         } //case ROOMTEMP
         case CO2:
         {
-            const char JSONformat[] = "\"property_measurements\":"
-                "[{\"property_name\":\"CO2concentration\","
+            const char JSONformat[] = "\"property_measurements\":["
+                "{\"property_name\":\"CO2concentration\","
                 "\"timestamp\":\"%ld\","
                 "\"timestamp_type\":\"end\","
                 "\"interval\":%u,"
-                "\"measurements\":[%s]}]}";
+                "\"measurements\":[%s]},"
+
+                "{\"property_name\":\"relativeHumidity\","
+                "\"timestamp\":\"%ld\","
+                "\"timestamp_type\":\"end\","
+                "\"interval\":%u,"
+                "\"measurements\":[%s]},"
+
+                "{\"property_name\":\"roomTempCO2\","
+                "\"timestamp\":\"%ld\","
+                "\"timestamp_type\":\"end\","
+                "\"interval\":%u,"
+                "\"measurements\":[%s]}"
+                "]}";
             long now = time(NULL); //Get current time
             ESP_LOGI("JSON", "Received CO2, containing %d measurements\n", message->numberofMeasurements);
-            char measurements[(6 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
-            measurements[0] = 0;                             //initialise 0 on first element of array to indicate start of string
-            uint16_t co2ppm[120];
-            memcpy(co2ppm, message->data, sizeof(message->data)); //copy data from uint8_t[240] to datatype of measurement.  Could this be typecast instead of copy?
+            char measurementsppm[(6 * MAX_CO2_SAMPLES) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
+            measurementsppm[0] = 0;                             //initialise 0 on first element of array to indicate start of string
+            char measurementsTemp[(6 * MAX_CO2_SAMPLES) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
+            measurementsTemp[0] = 0;                             //initialise 0 on first element of array to indicate start of string
+            char measurementsRH[(6 * MAX_CO2_SAMPLES) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
+            measurementsRH[0] = 0;
+            struct CO2_message {
+                uint16_t scd41ppm[MAX_CO2_SAMPLES];
+                uint16_t scd41temp[MAX_CO2_SAMPLES];
+                uint16_t scd41rh[MAX_CO2_SAMPLES];
+            } co2EspNowMessage;
+
+            memcpy(&co2EspNowMessage, message->data, sizeof(message->data));
             uint8_t i;
             for (i = 0; i < message->numberofMeasurements; i++) {
                 if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\"", co2ppm[i]);
-                    strcat(measurements, measurementString);
+                    sprintf(measurementString, "\"%hd\"", co2EspNowMessage.scd41ppm[i]);
+                    strcat(measurementsppm, measurementString);
                 }
                 else {
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\",", co2ppm[i]);
-                    strcat(measurements, measurementString);
+                    sprintf(measurementString, "\"%hd\",", co2EspNowMessage.scd41ppm[i]);
+                    strcat(measurementsppm, measurementString);
+                }
+            } //for(i<numberofMeasurements)
+            for (i = 0; i < message->numberofMeasurements; i++) {
+                if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
+                    char measurementString[9];
+                    sprintf(measurementString, "\"%2.2f\"", (-45 + 175 * co2EspNowMessage.scd41temp[i] / 65536.0f));
+                    strcat(measurementsTemp, measurementString);
+                }
+                else {
+                    char measurementString[9];
+                    sprintf(measurementString, "\"%2.2f\",", (-45 + 175 * co2EspNowMessage.scd41temp[i] / 65536.0f));
+                    strcat(measurementsTemp, measurementString);
+                }
+            } //for(i<numberofMeasurements)
+            for (i = 0; i < message->numberofMeasurements; i++) {
+                if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
+                    char measurementString[9];
+                    sprintf(measurementString, "\"%3.1f\"", (100 * co2EspNowMessage.scd41rh[i] / 65536.0f));
+                    strcat(measurementsRH, measurementString);
+                }
+                else {
+                    char measurementString[9];
+                    sprintf(measurementString, "\"%3.1f\",", (100 * co2EspNowMessage.scd41rh[i] / 65536.0f));
+                    strcat(measurementsRH, measurementString);
                 }
             } //for(i<numberofMeasurements)
             char *stringifiedMessage = malloc(JSON_BUFFER_SIZE); //Do not forget to free after sending! Should this be on stack? or return pointer to this from function and handle HTTPS POST in seperate function? (should then remove upload time insertion here...)
-            sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurements);
+            sprintf(stringifiedMessage, JSONformat, now, message->intervalTime, measurementsppm, now, message->intervalTime, measurementsTemp, now, message->intervalTime, measurementsRH);
             //HTTPS_post(stringifiedmessage);               //not yet working
             ESP_LOGI("JSON", "%s\n", stringifiedMessage);
             return stringifiedMessage;

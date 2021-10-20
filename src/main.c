@@ -18,7 +18,7 @@
 
 #define P1_READ_INTERVAL 10 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
 
-const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS;
+const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS_AND_CO2;
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 

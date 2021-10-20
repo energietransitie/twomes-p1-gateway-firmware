@@ -87,8 +87,8 @@ typedef struct Boiler_message {
     uint8_t numberofMeasurements;                       //number of measurements in burst
     uint16_t index;                                     //Number identifying the message, only increments on receiving an ACK from Gateway. Could be uint8_t since overflows are ignored?
     uint16_t intervalTime;               //Interval between measurements, for timestamping in gateway
-    int16_t pipeTemps1[MAX_BOILER_SAMPLES];             //measurements of the first temperature sensor
-    int16_t pipeTemps2[MAX_BOILER_SAMPLES];             //measurements of the second temperature sensor
+    uint16_t pipeTemps1[MAX_BOILER_SAMPLES];             //measurements of the first temperature sensor
+    uint16_t pipeTemps2[MAX_BOILER_SAMPLES];             //measurements of the second temperature sensor
 } Boiler_message;
 #define MAX_TEMP_SAMPLES 120
 typedef struct Roomtemp_Message {
@@ -96,7 +96,7 @@ typedef struct Roomtemp_Message {
     uint8_t numberofMeasurements;                       //number of measurements in burst
     uint16_t index;                                     //Number identifying the message, only increments on receiving an ACK from Gateway. Could be uint8_t since overflows are ignored?
     uint16_t intervalTime;                              //Interval between measurements, for timestamping in gateway
-    int16_t roomTemps[MAX_TEMP_SAMPLES];                //measurements of the Si7051
+    uint16_t roomTemps[MAX_TEMP_SAMPLES];                //measurements of the Si7051
 } Roomtemp_Message;
 #define MAX_CO2_SAMPLES 40
 typedef struct CO2_Message {
@@ -104,9 +104,9 @@ typedef struct CO2_Message {
     uint8_t numberofMeasurements;                       //number of measurements in burst
     uint16_t index;                                     //Number identifying the message, only increments on receiving an ACK from Gateway. Could be uint8_t since overflows are ignored?
     uint16_t intervalTime;                              //Interval between measurements, for timestamping in gateway
-    int16_t co2ppm[MAX_CO2_SAMPLES];                    //measurements of the CO2 concentration
-    int16_t co2temp[MAX_CO2_SAMPLES];                   //measurements of the temperature by SCD41
-    int16_t co2humid[MAX_CO2_SAMPLES];                  //measurements of the humidity
+    uint16_t co2ppm[MAX_CO2_SAMPLES];                    //measurements of the CO2 concentration
+    uint16_t co2temp[MAX_CO2_SAMPLES];                   //measurements of the temperature by SCD41
+    uint16_t co2humid[MAX_CO2_SAMPLES];                  //measurements of the humidity
 } CO2_Message;
 
 //Error types for P1 data reading:

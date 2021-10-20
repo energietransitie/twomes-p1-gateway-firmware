@@ -115,7 +115,7 @@ char *packageESPNowMessageJSON(ESP_message *message) {
             ESP_LOGI("JSON", "Received ROOMTEMP with index %d, containing %d measurements\n", message->index, message->numberofMeasurements);
             //Post boilertemp 1:
             {                                                    //Place in scope to free stack after post
-                char measurements[(8 * MAX_SAMPLES_ESPNOW) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
+                char measurements[(8 * MAX_TEMP_SAMPLES) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
                 uint8_t i;
                 measurements[0] = 0; //initialise 0 on first element of array to indicate start of string
                 uint16_t roomTemps[120];
@@ -169,9 +169,9 @@ char *packageESPNowMessageJSON(ESP_message *message) {
             char measurementsRH[(6 * MAX_CO2_SAMPLES) + 1]; //Allocate 8 chars per measurement, (5 for value, 1 comma seperator and  2 apostrophes)
             measurementsRH[0] = 0;
             struct CO2_message {
-                int16_t scd41ppm[MAX_CO2_SAMPLES];
-                int16_t scd41temp[MAX_CO2_SAMPLES];
-                int16_t scd41rh[MAX_CO2_SAMPLES];
+                uint16_t scd41ppm[MAX_CO2_SAMPLES];
+                uint16_t scd41temp[MAX_CO2_SAMPLES];
+                uint16_t scd41rh[MAX_CO2_SAMPLES];
             } co2EspNowMessage;
 
             memcpy(&co2EspNowMessage, message->data, sizeof(message->data));
@@ -179,36 +179,36 @@ char *packageESPNowMessageJSON(ESP_message *message) {
             for (i = 0; i < message->numberofMeasurements; i++) {
                 if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\"", co2EspNowMessage.scd41ppm[i]);
+                    sprintf(measurementString, "\"%hd\"", co2EspNowMessage.scd41ppm[i]);
                     strcat(measurementsppm, measurementString);
                 }
                 else {
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\",", co2EspNowMessage.scd41ppm[i]);
+                    sprintf(measurementString, "\"%hd\",", co2EspNowMessage.scd41ppm[i]);
                     strcat(measurementsppm, measurementString);
                 }
             } //for(i<numberofMeasurements)
             for (i = 0; i < message->numberofMeasurements; i++) {
                 if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\"", co2EspNowMessage.scd41temp[i]);
+                    sprintf(measurementString, "\"%2.2f\"", (-45 + 175 * co2EspNowMessage.scd41temp[i] / 65536.0f));
                     strcat(measurementsTemp, measurementString);
                 }
                 else {
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\",", co2EspNowMessage.scd41temp[i]);
+                    sprintf(measurementString, "\"%2.2f\",", (-45 + 175 * co2EspNowMessage.scd41temp[i] / 65536.0f));
                     strcat(measurementsTemp, measurementString);
                 }
             } //for(i<numberofMeasurements)
             for (i = 0; i < message->numberofMeasurements; i++) {
                 if (i == message->numberofMeasurements - 1) { //Print last measurement without comma
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\"", co2EspNowMessage.scd41rh[i]);
+                    sprintf(measurementString, "\"%3.1f\"", (100 * co2EspNowMessage.scd41rh[i] / 65536.0f));
                     strcat(measurementsRH, measurementString);
                 }
                 else {
                     char measurementString[9];
-                    sprintf(measurementString, "\"%d\",", co2EspNowMessage.scd41rh[i]);
+                    sprintf(measurementString, "\"%3.1f\",", (100 * co2EspNowMessage.scd41rh[i] / 65536.0f));
                     strcat(measurementsRH, measurementString);
                 }
             } //for(i<numberofMeasurements)

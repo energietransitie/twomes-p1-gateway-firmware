@@ -20,6 +20,7 @@
 #include <nvs_flash.h>
 #include <esp_tls.h>
 #include <esp_http_client.h>
+#define HTTPSTATUS_OK 200 //change everywhere in code to HttpStatus_Ok when including esp_http_client.h library of 19 Nov 2020 or later
 #include <driver/gpio.h>
 
 #include <wifi_provisioning/manager.h>
@@ -28,7 +29,7 @@
 #include "presence_detection.h"
 #endif
 
-#define VERSION "V2.0.0"
+#define VERSION "V2.5.0"
 #define WIFI_RESET_BUTTON   GPIO_NUM_0
 #define LED_ERROR   GPIO_NUM_19
 #define MAX_RESPONSE_LENGTH 100
@@ -41,15 +42,12 @@
 
 #define LONG_BUTTON_PRESS_DURATION 10 // seconds
 
-#define POST_WITH_BEARER true
-#define POST_WITHOUT_BEARER false
-
 #define HTTPS_PRE_WAIT_MS (100) // milliseconds
 #define HTTPS_RETRY_WAIT_MS (2 * 1000) // milliseconds ( 2 s * 1000 ms/s)  
 #define HTTPS_POST_WAIT_MS (100) // milliseconds
-#define HTTPS_UPLOAD_RETRIES 10 // number of retries inclusing initial try
-
-#define NTP_RETRIES 10 // // number of retries for timesync inclusing initial try
+#define HTTPS_UPLOAD_RETRIES 10 // number of retries including initial try
+#define WIFI_CONNECT_RETRIES 10 // number of retries including initial try
+#define NTP_RETRIES 10 // // number of retries for timesync including initial try
 
 #ifdef CONFIG_TWOMES_STRESS_TEST
 #define HEARTBEAT_UPLOAD_INTERVAL_MS (1 * 60  * 1000) // milliseconds ( 1 min * 60 s/min * 1000 ms/s) // stress test value
@@ -57,7 +55,7 @@
 #define HEARTBEAT_MEASUREMENT_INTERVAL_TXT "Wating 1 minute for next heartbeat"
 #define TIMESYNC_INTERVAL_MS (4 * 60 * 1000) // milliseconds (4 min * 60 s/min * 1000 ms/s)  // stress test value 
 #define TIMESYNC_INTERVAL_TXT "Wating 4 minutes before next NTP timesync"
-#define MAX_WAIT_802_11_MS (30 * 1000) // milliseconds ( 20 s * 1000 ms/s)
+#define MAX_WAIT_802_11_MS (30 * 1000) // milliseconds ( 30 s * 1000 ms/s)
 #define MAX_WAIT_802_11_TXT "30 seconds"
 #else
 #define HEARTBEAT_MEASUREMENT_INTERVAL_MS (10 * 60 * 1000) // milliseconds ( 10 min * 60 s/min * 1000 ms/s)
@@ -65,7 +63,7 @@
 #define HEARTBEAT_MEASUREMENT_INTERVAL_TXT "Wating 10 minutes for next heartbeat"
 #define TIMESYNC_INTERVAL_MS (6 *60 * 60 * 1000) // milliseconds (6 hr * 60 min/hr * 60 s/min * 1000 ms/s)   
 #define TIMESYNC_INTERVAL_TXT "Wating 6 hours before next NTP timesync"
-#define MAX_WAIT_802_11_MS (30 * 1000) // milliseconds ( 20 s * 1000 ms/s)
+#define MAX_WAIT_802_11_MS (30 * 1000) // milliseconds ( 30 s * 1000 ms/s)
 #define MAX_WAIT_802_11_TXT "30 seconds"
 #endif
 
@@ -112,13 +110,18 @@ esp_err_t custom_prov_data_handler(uint32_t session_id, const uint8_t *inbuf, ss
 void initialize_sntp(void);
 void obtain_time(void);
 void timesync_task(void *data);
-void timesync();
+#define ALREADY_CONNECTED true
+#define NOT_ALREADY_CONNECTED false
+void timesync(bool already_connected);
 void initialize_timezone(char *timezone);
-int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
+#define POST_WITH_BEARER true
+#define POST_WITHOUT_BEARER false
+int upload_data_to_server(char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
+int post_https(char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
 void upload_heartbeat(int hbcounter);
 void heartbeat_task(void *data);
 char *get_bearer();
-void activate_device(char *name);
+void activate_device();
 void get_http(const char *url);
 #ifdef CONFIG_TWOMES_PRESENCE_DETECTION
 void start_presence_detection();

@@ -612,7 +612,7 @@ void sendEspNowChannel(void *args) {
 }
 
 /**
- * @brief turn off Wi-Fi capabilities and switch to the ESP-Now channel
+ * @brief turn off ESP-Now capabilities and switch to Wi-Fi
  *
  * @param reason string for task name to help debugging
  *
@@ -625,7 +625,7 @@ int p1ConfigSetupWiFi(char *reason) {
 }
 
 /**
- * @brief turn off ESP-now capabilities and connect to Wi-Fi
+ * @brief disconnect from Wi-Fi and turn on ESP-Now
  *
  * @return succes status
  */
@@ -645,9 +645,9 @@ int p1ConfigSetupEspNow() {
  * @param data JSON stringified payload, typecast to void*
  */
 void postESPNOWbackoffice(void *args) {
-    p1ConfigSetupWiFi("ESP-Now message POST"); //connect to Wi-Fi
+    //p1ConfigSetupWiFi("ESP-Now message POST"); //connect to Wi-Fi
     //Short delay to get Wi-Fi set up
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     //Add the time of posting to the JSON message
     time_t now = time(NULL);
@@ -668,7 +668,6 @@ void postESPNOWbackoffice(void *args) {
     //TODO: Keep "args" (JSON data without timestamp) for buffering
     free(args);
     free(postJSON); //Gets freed in post_https function (This should not be the case?)
-    disconnect_wifi("Post ESP-Now data");
     vTaskDelete(NULL); //Self destruct
 }
 
@@ -678,9 +677,9 @@ void postESPNOWbackoffice(void *args) {
  * @param data JSON stringified payload, typecast to void*
  */
 void postP1backoffice(void *args) {
-    p1ConfigSetupWiFi("Post P1 Data"); //connect to Wi-Fi
+    //p1ConfigSetupWiFi("Post P1 Data"); //connect to Wi-Fi
     //Short delay to get Wi-Fi set up
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     //Add the time of posting to the JSON message
     time_t now = time(NULL);
@@ -709,7 +708,6 @@ void postP1backoffice(void *args) {
     free(args);
     free(postJSON);
     //Switch back to ESP-Now after post
-    disconnect_wifi("Post P1 data");
 
     vTaskDelete(NULL); //Self destruct
 }

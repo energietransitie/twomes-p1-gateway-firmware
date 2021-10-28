@@ -39,7 +39,7 @@
 #define INPUT_BITMASK ((1ULL << BUTTON_P1) | (1ULL << BUTTON_P2))
 
 //UART defines
-#define P1_BUFFER_SIZE 1024
+#define P1_BUFFER_SIZE 2048
 #define P1PORT_UART_NUM UART_NUM_2
 
 //DeviceTypes

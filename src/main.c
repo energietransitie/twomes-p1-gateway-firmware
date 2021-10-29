@@ -15,7 +15,7 @@
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 
-#define LOG_LEVEL_LOCAL 4
+#define LOG_LEVEL_LOCAL 3
 
 #define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
 

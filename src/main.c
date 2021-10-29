@@ -15,10 +15,11 @@
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 
+#define LOG_LEVEL_LOCAL 3
 
-#define P1_READ_INTERVAL 10 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
+#define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
 
-const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS_AND_CO2;
+const char *device_type_name = DEVICETYPE_P1_ONLY;
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
@@ -104,13 +105,16 @@ void app_main(void) {
 //function to read P1 port and store message in a buffer
 void read_P1(void *args) {
     while (1) {
+        //Read the current time to compensate the delay:
+        int64_t lP1ReadStartTime = esp_timer_get_time();
+
         //Empty the buffer before requesting data to clear it of junk
         uart_flush(P1PORT_UART_NUM);
         ESP_LOGI("P1", "Attempting to read P1 Port");
         //DRQ pin has inverter to pull up to 5V, which makes it active low:      
         gpio_set_level(PIN_DRQ, 0);
-        //Give some time to let data transmit. 115200 baud with max 1kB data = max 70ms data transmission           
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+        //Wait for 10 seconds to ensure a message is read even on a DSMR4.x device:
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
         //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
         gpio_set_level(PIN_DRQ, 1);
 
@@ -119,11 +123,12 @@ void read_P1(void *args) {
 
         //Read data from the P1 UART:
         int len = uart_read_bytes(P1PORT_UART_NUM, data, P1_BUFFER_SIZE, 20 / portTICK_PERIOD_MS);
+
         //If data is received:
         if (len > 0) {
             //Trim the received message to contain only the necessary data and store the CRC as an unsigned int:
             char *p1MessageStart = strchr((const char *)data, '/'); //Find the position of the start-of-message character ('/')
-            char *p1MessageEnd = strchr((const char *)data, '!');   //Find the position of the end-of-message character ('!')
+            char *p1MessageEnd = strchr((const char *)p1MessageStart, '!');   //Find the position of the end-of-message character ('!')
 
             //Check if a message is received:
             if (p1MessageEnd != NULL) {
@@ -138,7 +143,7 @@ void read_P1(void *args) {
                 memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
                 p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
 
-                //Free the original read data
+                //Free the original read data, since message is now in "p1Message" variable
                 free(data);
 
                 //Calculate the CRC of the trimmed message:
@@ -147,7 +152,7 @@ void read_P1(void *args) {
                 //Check if CRC match:
                 if (calculatedCRC == receivedCRC) {
                     //log received CRC and calculated CRC for debugging
-                    ESP_LOGI("P1", "Received matching CRC: (%4X == %4X)", receivedCRC, calculatedCRC);
+                    ESP_LOGD("P1", "Received matching CRC: (%4X == %4X)", receivedCRC, calculatedCRC);
                     ESP_LOGI("P1", "Parsing message into struct:");
                     //Create a struct for the p1 measurements
                     P1Data p1Measurements;
@@ -177,7 +182,7 @@ void read_P1(void *args) {
                 else {
                     //Log received and calculated CRC for debugging and flash the Error LED
                     ESP_LOGI("ERROR - P1", "CRC DOES NOT MATCH");
-                    ESP_LOGI("ERROR - P1", "Received CRC %4X but calculated CRC %4X", receivedCRC, calculatedCRC);
+                    ESP_LOGD("ERROR - P1", "Received CRC %4X but calculated CRC %4X", receivedCRC, calculatedCRC);
 
                     //Blink error LED twice
                     char blinkArgs[2] = { 2, LED_ERROR };
@@ -187,6 +192,9 @@ void read_P1(void *args) {
                 //Free the P1 message from memory
                 free(p1Message);
             }//if(p1MessageEnd != NULL)
+            else {
+                ESP_LOGI("P1", "P1 message was invalid");
+            }
         }//if len>0;
 
         //Release the memory if a wrong message is received:
@@ -194,8 +202,10 @@ void read_P1(void *args) {
             free(data);
         }//else (if(len>0))
 
+        int64_t lTimeAfterP1Read = esp_timer_get_time();
+        int64_t lTimeDiffMilliSeconds = (lTimeAfterP1Read - lP1ReadStartTime) / 1000;
 
-        vTaskDelay((P1_READ_INTERVAL - 200) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
+        vTaskDelay((P1_READ_INTERVAL - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
     } //while(1) - Never ending Task
 } //void read_P1
 

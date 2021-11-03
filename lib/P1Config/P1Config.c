@@ -1,20 +1,32 @@
 #include "P1Config.h"
 #define LOG_LOCAL_LEVEL 3
-#define BAUD_RATE 9600 //for DSMR22 else 115200
+#define DSMR22 1 
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */
 void initP1UART() {
     //UART Configuration for P1-Port reading:
+    #if defined(DSMR22)
+    //9600 baud 7E1, even parity
+    uart_config_t uart_config = {
+        .baud_rate = 9600,
+        .data_bits = UART_DATA_7_BITS,
+        .parity = UART_PARITY_EVEN,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 122,
+    };
+    #else
     //115200 baud, 8n1, no parity, no HW flow control
     uart_config_t uart_config = {
-        .baud_rate = BAUD_RATE,
+        .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
     };
+    #endif
     ESP_ERROR_CHECK(uart_param_config(P1PORT_UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(P1PORT_UART_NUM, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_set_line_inverse(P1PORT_UART_NUM, UART_SIGNAL_RXD_INV | UART_SIGNAL_IRDA_RX_INV)); //Invert RX data

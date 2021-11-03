@@ -1,5 +1,6 @@
 #define DEBUG 1
 #define CUSTOM_IO 1
+#define DSMR22 1
 //Generic Twomes Firmware
 #include "generic_esp_32.h"
 
@@ -15,11 +16,11 @@
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 
-#define LOG_LEVEL_LOCAL 3
+#define LOG_LEVEL_LOCAL 4
 
 #define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
 
-const char *device_type_name = DEVICETYPE_P1_ONLY;
+const char *device_type_name = DEVICETYPE_P1_WITH_SENSORS_AND_CO2;
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
@@ -113,8 +114,8 @@ void read_P1(void *args) {
         ESP_LOGI("P1", "Attempting to read P1 Port");
         //DRQ pin has inverter to pull up to 5V, which makes it active low:      
         gpio_set_level(PIN_DRQ, 0);
-        //Wait for 10 seconds to ensure a message is read even on a DSMR4.x device:
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        //Wait for 11 seconds to ensure a whole message is read even on a DSMR4.x device:
+        vTaskDelay(11000 / portTICK_PERIOD_MS);
         //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
         gpio_set_level(PIN_DRQ, 1);
 
@@ -123,7 +124,9 @@ void read_P1(void *args) {
 
         //Read data from the P1 UART:
         int len = uart_read_bytes(P1PORT_UART_NUM, data, P1_BUFFER_SIZE, 20 / portTICK_PERIOD_MS);
-
+        ESP_LOGD("P1", "Received message length: %d bytes)", len);
+        //ESP_LOGD("P1", "Received total message:\n %s)", data);
+        
         //If data is received:
         if (len > 0) {
             //Trim the received message to contain only the necessary data and store the CRC as an unsigned int:
@@ -140,15 +143,18 @@ void read_P1(void *args) {
                 //Allocate memory to copy the trimmed message into
                 uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
                 //Trim the message to only include 1 full P1 port message:
-                memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
-                p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
-
+                len = (int) (p1MessageEnd - p1MessageStart) + 1;
+                memcpy(p1Message, p1MessageStart, len);
+                p1Message[len] = 0; //Add zero terminator to end of message
+                ESP_LOGD("P1", "Trimmed message length: %d bytes)", len);
                 //Free the original read data, since message is now in "p1Message" variable
                 free(data);
 
                 //Calculate the CRC of the trimmed message:
-                unsigned int calculatedCRC = CRC16(0x0000, p1Message, (int)(p1MessageEnd - p1MessageStart + 1));
-
+                unsigned int calculatedCRC = CRC16(0x0000, p1Message, len);
+                #if defined(DSMR22)
+                  receivedCRC = calculatedCRC;
+                #endif
                 //Check if CRC match:
                 if (calculatedCRC == receivedCRC) {
                     //log received CRC and calculated CRC for debugging

@@ -1,5 +1,6 @@
 #include "P1Config.h"
 #define LOG_LOCAL_LEVEL 3
+#define BAUD_RATE 9600 //for DSMR22 else 115200
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */
@@ -7,7 +8,7 @@ void initP1UART() {
     //UART Configuration for P1-Port reading:
     //115200 baud, 8n1, no parity, no HW flow control
     uart_config_t uart_config = {
-        .baud_rate = 115200,
+        .baud_rate = BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,

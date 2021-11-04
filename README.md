@@ -23,24 +23,24 @@ This section describes how you can deploy binary releases of the firmware, i.e. 
 ### Prerequisites
 To deploy the firmware, in addition to the [generic prerequisites for deploying Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#prerequisites), you need:
 * a 3.3V TTL-USB Serial Port Adapter (e.g. [FT232RL](https://www.tinytronics.nl/shop/en/communication-and-signals/usb/ft232rl-3.3v-5v-ttl-usb-serial-port-adapter), CP210x, etc..), including the cable to connect ths adapter to a free USB port on your computer (a USB to miniUSB cable in the case of a [FT232RL](https://www.tinytronics.nl/shop/en/communication-and-signals/usb/ft232rl-3.3v-5v-ttl-usb-serial-port-adapter));
+* (optional: more stable) Supply 5V DC power to the device via the micro-USB jack of the device.
+* Find a row of 6 holes holes (next to the ESP32 on the PCB of the  P1 Gateway), find the `GND` pin (see  bottom of the PCB), alighn the 6 pins of the serial port adapter such that `GND` and other pins match; then connect the serial port adapter to your computer and connect the 6 pins of the serial port adapter to the 6 holes on the PCB.
 
 ### Device preparation step 1: Uploading firmware
 
 * Download the [binary release for your device](https://github.com/energietransitie/twomes-p1-gateway-firmware/releases) and extract it to a directory of your choice.
 * If you used the device before, you shoud first [erase all persistenly stored data](#erasing-all-persistenly-stored-data).
-* (optional: more stable) Supply 5V DC power to the device via the micro-USB jack of the device.
-* Before you connect the serial port adapter to your computer and connect the 6 pins of the serial port adapter to the  6 holes next to the ESP32 on the P1-Gateway PCB; then connect the 6 pins to the 6 holes.
 * Open a comand prompt in that directory, change the directory to the binaries subfolder and enter (**N.B. this command differs from the deployment command of the generic firmware**):
 	```shell
 	py -m esptool --chip esp32 --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x9000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin  
 	```
 * This should automatically detect the USB port that the device is connected to.
-* If not, then open the Device Manager (in Windows press the `Windows + X` key combination, then select Device Manager), go to View and click Show Hidden Devices. Then unfold `Ports (COM & LPT)`. You should find the device there, named `USB-Serial CH340 *(COM?)` with `?` being a single digit.  
+* If not, then open the Device Manager (in Windows press the `Windows + X` key combination, then select Device Manager), go to View and click Show Hidden Devices. Then unfold `Ports (COM & LPT)`. You should find the device there, named `USB-Serial Port`. If there is no numbered COM port indicated, it's usually the next in sequence.  
 * If the COM port is not automatically detected, then enter (while replacing `?` with the digit found in the previous step) (**N.B. this command differs from the deployment command of the generic firmware**): 
 	```shell
 	py -m esptool --chip esp32 --port "COM?" --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x9000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin```
 
-* When you see the beginning of the sequence `conecting ....___....`, press and hold the button labeled `GPIO1` on the PCB, then briefly press the button labeled `RESET`,then release the button labeled `GPIO1`;
+* When you see the beginning of the sequence `conecting ......_____......`, press and hold the button labeled `GPIO1 (SW2)` on the PCB, then briefly press the button labeled `RESET`, then release the button labeled `GPIO1 (SW2) `;
 * You should see an indication that the firmware is being written to the device.
 
 ### Device Preparation step 2 and further 
@@ -49,8 +49,8 @@ Please follow the [generic firmware instructions for these steps](https://github
 ## Developing 
 This section describes how you can change the source code using a development environment and compile the source code into a binary release of the firmware that can be depoyed, either via the development environment, or via the method described in the section [Deploying](#deploying).
 
-Please see the [developing section of the generig Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#developing) first. Reember to presse buttons to upload the firmware: 
-* When you see the beginning of the sequence `conecting ....___....`, press and hold the button labeled `GPIO1` on the PCB, then briefly press the button labeled `RESET`,then release the button labeled `GPIO1`;
+Please see the [developing section of the generig Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#developing) first. Remember to press buttons to upload the firmware: 
+* When you see the beginning of the sequence `conecting ....___....`, press and hold the button labeled `GPIO1 (SW2)` on the PCB, then briefly press the button labeled `RESET (SW1)`, then release the button labeled `GPIO1 (SW2)`;
 * You should see an indication that the firmware is being written to the device.
 
 ## Features

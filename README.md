@@ -62,9 +62,7 @@ Ready:
 * Reset Wi-Fi provisioning data when the factory reset button `F` is held for over 10 seconds (this button is labeled `SW2` and `GPIO` on the PCB) 
 * Pair with and receive ESP-NOW data from satellite measurement devices
 	* [Twomes Boiler Monitor Module](https://github.com/energietransitie/twomes-boiler-monitor-firmware)
-	* [Twomes Room Monitor Module](https://github.com/energietransitie/twomes-room-monitor-firmware) 
-* Implement Channel and MAC provisioning to satellite measurement devices
- 
+	* [Twomes Room Monitor Module](https://github.com/energietransitie/twomes-room-monitor-firmware)  
 To-do:
 * Read data from the P1- port of DSMRv2 (UART settings 9600/7E1)  
 

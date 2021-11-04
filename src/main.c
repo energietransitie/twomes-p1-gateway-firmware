@@ -19,7 +19,11 @@
 
 #define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
 
-const char *device_type_name = DEVICETYPE_P1_ONLY;
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#pragma message "Building devicetype: "  STR(DEVICE_TYPE)
+const char *device_type_name = DEVICE_TYPE;
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
@@ -113,8 +117,8 @@ void read_P1(void *args) {
         ESP_LOGI("P1", "Attempting to read P1 Port");
         //DRQ pin has inverter to pull up to 5V, which makes it active low:      
         gpio_set_level(PIN_DRQ, 0);
-        //Wait for 10 seconds to ensure a message is read even on a DSMR4.x device:
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        //Wait for 11 seconds to ensure a message is read even on a DSMR4.x device:
+        vTaskDelay(11000 / portTICK_PERIOD_MS);
         //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
         gpio_set_level(PIN_DRQ, 1);
 
@@ -128,7 +132,9 @@ void read_P1(void *args) {
         if (len > 0) {
             //Trim the received message to contain only the necessary data and store the CRC as an unsigned int:
             char *p1MessageStart = strchr((const char *)data, '/'); //Find the position of the start-of-message character ('/')
-            char *p1MessageEnd = strchr((const char *)p1MessageStart, '!');   //Find the position of the end-of-message character ('!')
+            char *p1MessageEnd = NULL;
+            //Only look for end if a start is found:
+            if (p1MessageStart != NULL) p1MessageEnd = strchr((const char *)p1MessageStart, '!');   //Find the position of the end-of-message character ('!')
 
             //Check if a message is received:
             if (p1MessageEnd != NULL) {
@@ -138,13 +144,10 @@ void read_P1(void *args) {
                 //Start the scanf one char after the end-of-message symbol (location of CRC16), and read a 4-symbol hex number
                 sscanf(p1MessageEnd + 1, "%4X", &receivedCRC);
                 //Allocate memory to copy the trimmed message into
-                uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
+                uint8_t *p1Message = malloc(P1_MESSAGE_SIZE);
                 //Trim the message to only include 1 full P1 port message:
                 memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
                 p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
-
-                //Free the original read data, since message is now in "p1Message" variable
-                free(data);
 
                 //Calculate the CRC of the trimmed message:
                 unsigned int calculatedCRC = CRC16(0x0000, p1Message, (int)(p1MessageEnd - p1MessageStart + 1));
@@ -196,11 +199,8 @@ void read_P1(void *args) {
                 ESP_LOGI("P1", "P1 message was invalid");
             }
         }//if len>0;
-
-        //Release the memory if a wrong message is received:
-        else {
-            free(data);
-        }//else (if(len>0))
+        //Release the data from the memory buffer:
+        free(data);
 
         int64_t lTimeAfterP1Read = esp_timer_get_time();
         int64_t lTimeDiffMilliSeconds = (lTimeAfterP1Read - lP1ReadStartTime) / 1000;

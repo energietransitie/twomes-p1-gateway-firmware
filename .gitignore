@@ -5,5 +5,7 @@
 .vscode/ipch
 src/utils.h
 
+binaries
+
 src/espnow_settings.h
 src/BLE_Twomes.h

@@ -42,19 +42,6 @@
 #define P1_BUFFER_SIZE 2048
 #define P1PORT_UART_NUM UART_NUM_2
 
-//DeviceTypes
-#define DEVICETYPE_P1_ONLY "DSMR-P1-gateway"
-#define DEVICETYPE_P1_WITH_SENSORS "DSMR-P1-gateway-TinTsTr"
-#define DEVICETYPE_P1_WITH_SENSORS_AND_CO2 "DSMR-P1-gateway-TinTsTrCO2"
-#define DEVICETYPE_P1_WITH_CO2 "DSMR-P1-gateway-TinCO2"
-
-//HTTP and JSON
-#define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl"
-#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
-
-#define ACTIVATION_URL TWOMES_SERVER"/device/activate"
-#define VARIABLE_INTERVAL_URL "/device/measurements/variable-interval"
-#define FIXED_INTERVAL_URL "/device/measurements/fixed-interval"
 
 #define JSON_BUFFER_SIZE 2048
 
@@ -136,19 +123,8 @@ typedef struct channelListstruct {
     uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
 }channelList;
 
-//Data type intervals:
-//Boiler    - 3m20s
-//HB        - 10m
-//Roomtemp  - 
-//Co2       - 
-//P1        - 
-//Presence  - 
-#define INTERVAL_BOILER     200 //3m20
-#define INTERVAL_ROOM           
-#define INTERVAL_CO2            
-#define INTERVAL_HB        3600 //1 hour
-#define INTERVAL_PRESENCE   300 //5m
-#define INTERVAL_P1         900 //15min
+
+
 
 
 /** ====== GLOBAL VARIABLES ============== */

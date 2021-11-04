@@ -3,6 +3,28 @@
 //Generic Twomes Firmware
 #include "generic_esp_32.h"
 
+#ifdef CONFIG_WITH_ROOMCO2_SATELLITE
+    #ifdef CONFIG_WITH_BOILER_SATELLITE
+    const char *device_type_name = "DSMR-P1-gateway-TinTsTrCO2";
+    #else
+    const char *device_type_name = "DSMR-P1-gateway-TinCO2";
+    #endif
+#elif CONFIG_WITH_ROOM_SATELLITE
+    #ifdef CONFIG_WITH_BOILER_SATELLITE
+    const char *device_type_name = "DSMR-P1-gateway-TinTsTr";
+    #else
+    const char *device_type_name = "DSMR-P1-gateway-Tin";
+    #endif
+#else
+    #ifdef CONFIG_WITH_BOILER_SATELLITE
+    const char *device_type_name = "DSMR-P1-gateway-TsTr";
+    #else
+    const char *device_type_name = "DSMR-P1-gateway";
+    #endif
+#endif
+
+static const char *TAG = "Twomes P1 Gateway ESP32";
+
 //To create the JSON and read the P1 port
 #include "P1Config.h"
 #include <string.h>
@@ -17,13 +39,10 @@
 
 #define LOG_LEVEL_LOCAL 3
 
-#define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
-
-const char *device_type_name = DEVICETYPE_P1_ONLY;
+#define P1_MEASUREMENT_INTERVAL_MS 5 * 60 * 1000 //milliseconds (5 min * 60  s/min * 1000 ms/s)
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
-static const char *TAG = "Twomes P1 Gateway ESP32";
 
 //Interrupt Queue Handler:
 static xQueueHandle gpio_evt_queue = NULL;
@@ -205,7 +224,7 @@ void read_P1(void *args) {
         int64_t lTimeAfterP1Read = esp_timer_get_time();
         int64_t lTimeDiffMilliSeconds = (lTimeAfterP1Read - lP1ReadStartTime) / 1000;
 
-        vTaskDelay((P1_READ_INTERVAL - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
+        vTaskDelay ((P1_MEASUREMENT_INTERVAL_MS - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
     } //while(1) - Never ending Task
 } //void read_P1
 

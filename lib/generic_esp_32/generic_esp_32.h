@@ -72,6 +72,7 @@ xSemaphoreHandle wireless_802_11_mutex;
 #define TWOMES_SERVER_HOSTNAME "api.tst.energietransitiewindesheim.nl"
 #define TWOMES_SERVER "https://api.tst.energietransitiewindesheim.nl"
 #define VARIABLE_UPLOAD_ENDPOINT "/device/measurements/variable-interval"
+#define FIXED_INTERVAL_UPLOAD_ENDPOINT "/device/measurements/fixed-interval"
 #define DEVICE_ACTIVATION_ENDPOINT "/device/activate"
 
 #ifdef CONFIG_TWOMES_PROV_TRANSPORT_BLE

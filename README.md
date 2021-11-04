@@ -4,7 +4,8 @@ Firmware for the Twomes P1 Gateway measurement device.
 ## Table of contents
 * [General info](#general-info)
 * [Deploying](#deploying)
-* [Developing](#developing) 
+* [Developing](#developing)
+* [Pairing satellites](#pairing-satellites) 
 * [Features](#features)
 * [Status](#status)
 * [License](#license)
@@ -52,6 +53,14 @@ This section describes how you can change the source code using a development en
 Please see the [developing section of the generig Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#developing) first. Remember to press buttons to upload the firmware: 
 * When you see the beginning of the sequence `conecting ....___....`, press and hold the button labeled `GPIO1 (SW2)` on the PCB, then briefly press the button labeled `RESET (SW1)`, then release the button labeled `GPIO1 (SW2)`;
 * You should see an indication that the firmware is being written to the device.
+
+## Pairing satellites
+Pairing a satellite to the  [Twomes P1 Gateway measurement device](https://github.com/energietransitie/twomes-p1-gateway-firmware) works as follows:
+* Place the battery in the satellite module, make sure it is near the gateway device to be able to see whether the pairing is successful.
+* On the satellite module, press and hold the `GPIO15 (SW2)` button (labeled `K` on the enclosure, which stands for the Dutch word "Koppelen") and then briefly press the `RESET (SW1)` button (labeled `R` on the enclosure), `GPIO15 (SW2) for about second, until the green LED turns on; then release the button. The green LED will blink for 20 seconds to indicate that the satellite module is in pairing mode, i.e. listens (on 2.4 GHz channel 0) to the gateway device telling it which ESP-NOW channel to use after pairing.
+* On the gateway device, within these 20 seconds, press the `GPIO12 (SW2)` (labeled `K` on the enclosure, which stands for the Dutch word "Koppelen"). The gateway device now sends, via 2.4 GHz channel 0, which channel the gateway module should use for subsequent ESP-NOW messages. The green LED on the gateway device blinks shortly during this transmission.
+* On the satellite module, when the channel number received, the green LED will blink and after that the red LED.
+* This procedure can be repeated if needed (e.g., when the gateway device is connected to the internet via another Wi-Fi network).
 
 ## Features
 List of features ready and TODOs for future development (other than the [features of the generic Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#features)). 

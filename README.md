@@ -34,22 +34,35 @@ Run UPLOAD.bat
 
 
 ### On Linux/Mac
-Run the following command on the _command line_:
+Navigate to the folder containing the binaries and then run the following command on the _command line_:
 	```shell
-	py -m esptool --chip esp32 --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x8000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin  
+	py -m esptool --chip esp32 --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x9000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin  
 	```
 *	This should automatically detect the USB port that the device is connected to.
 *	If not, then open the Device Manager (in Windows press the `Windows + X` key combination, then select Device Manager), go to View and click Show Hidden Devices. Then unfold `Ports (COM & LPT)`. You should find the device there, named `USB-Serial CH340 *(COM?)` with `?` being a single digit.  
 *	If the COM port is not automatically detected, then enter (while replacing `?` with the digit found in the previous step): 
 	```shell
-	py -m esptool --chip esp32 --port "COM?" --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x8000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin
+	py -m esptool --chip esp32 --port "COM?" --baud 460800 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x9000 partitions.bin 0xe000 ota_data_initial.bin 0x10000 firmware.bin
 	```
 
 ## Developing with the source code 
 Install [Visual Studio Code](https://code.visualstudio.com/) and the [PlatformIO](https://platformio.org/platformio-ide) plugin
 
 Download the sourcecode, unzip it, and open the folder in Visual Studio Code.
-Modify the sourcecode to fit your needs. Connect your board, and press the arrow on the blue bar on the bottom left to compile and upload your code
+Modify the sourcecode to fit your needs. Connect the device using a Serial<->USB converter.
+
+##Building the code:
+To build the code, open a PlatformIO terminal in Visual Studio Code by pressing the "terminal" button on the blue bar at the bottom of the editor.
+Enter the command 
+```shell
+		pio run -e {environment}
+```
+replacing the {environment} with the type of P1 device you want to build for (the available environments can be found in the platformio.ini file)
+
+To build and upload, run:
+```shell
+		pio run -e {environment} -t upload
+```
 
 ## Features
 List of features ready and TODOs for future development. 

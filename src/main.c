@@ -3,28 +3,6 @@
 //Generic Twomes Firmware
 #include "generic_esp_32.h"
 
-#ifdef CONFIG_WITH_ROOMCO2_SATELLITE
-    #ifdef CONFIG_WITH_BOILER_SATELLITE
-    const char *device_type_name = "DSMR-P1-gateway-TinTsTrCO2";
-    #else
-    const char *device_type_name = "DSMR-P1-gateway-TinCO2";
-    #endif
-#elif CONFIG_WITH_ROOM_SATELLITE
-    #ifdef CONFIG_WITH_BOILER_SATELLITE
-    const char *device_type_name = "DSMR-P1-gateway-TinTsTr";
-    #else
-    const char *device_type_name = "DSMR-P1-gateway-Tin";
-    #endif
-#else
-    #ifdef CONFIG_WITH_BOILER_SATELLITE
-    const char *device_type_name = "DSMR-P1-gateway-TsTr";
-    #else
-    const char *device_type_name = "DSMR-P1-gateway";
-    #endif
-#endif
-
-static const char *TAG = "Twomes P1 Gateway ESP32";
-
 //To create the JSON and read the P1 port
 #include "P1Config.h"
 #include <string.h>
@@ -37,12 +15,19 @@ static const char *TAG = "Twomes P1 Gateway ESP32";
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 
-#define LOG_LEVEL_LOCAL 3
+#define LOG_LEVEL_LOCAL 4
 
-#define P1_MEASUREMENT_INTERVAL_MS 5 * 60 * 1000 //milliseconds (5 min * 60  s/min * 1000 ms/s)
+#define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
+
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#pragma message "Building devicetype: "  STR(DEVICE_TYPE)
+const char *device_type_name = DEVICE_TYPE;
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
+static const char *TAG = "Twomes P1 Gateway ESP32";
 
 //Interrupt Queue Handler:
 static xQueueHandle gpio_evt_queue = NULL;
@@ -132,8 +117,8 @@ void read_P1(void *args) {
         ESP_LOGI("P1", "Attempting to read P1 Port");
         //DRQ pin has inverter to pull up to 5V, which makes it active low:      
         gpio_set_level(PIN_DRQ, 0);
-        //Wait for 10 seconds to ensure a message is read even on a DSMR4.x device:
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        //Wait for 11 seconds to ensure a message is read even on a DSMR4.x device:
+        vTaskDelay(11000 / portTICK_PERIOD_MS);
         //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
         gpio_set_level(PIN_DRQ, 1);
 
@@ -147,7 +132,9 @@ void read_P1(void *args) {
         if (len > 0) {
             //Trim the received message to contain only the necessary data and store the CRC as an unsigned int:
             char *p1MessageStart = strchr((const char *)data, '/'); //Find the position of the start-of-message character ('/')
-            char *p1MessageEnd = strchr((const char *)p1MessageStart, '!');   //Find the position of the end-of-message character ('!')
+            char *p1MessageEnd = NULL;
+            //Only look for end if a start is found:
+            if (p1MessageStart != NULL) p1MessageEnd = strchr((const char *)p1MessageStart, '!');   //Find the position of the end-of-message character ('!')
 
             //Check if a message is received:
             if (p1MessageEnd != NULL) {
@@ -157,13 +144,10 @@ void read_P1(void *args) {
                 //Start the scanf one char after the end-of-message symbol (location of CRC16), and read a 4-symbol hex number
                 sscanf(p1MessageEnd + 1, "%4X", &receivedCRC);
                 //Allocate memory to copy the trimmed message into
-                uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
+                uint8_t *p1Message = malloc(P1_MESSAGE_SIZE);
                 //Trim the message to only include 1 full P1 port message:
                 memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
                 p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
-
-                //Free the original read data, since message is now in "p1Message" variable
-                free(data);
 
                 //Calculate the CRC of the trimmed message:
                 unsigned int calculatedCRC = CRC16(0x0000, p1Message, (int)(p1MessageEnd - p1MessageStart + 1));
@@ -215,16 +199,13 @@ void read_P1(void *args) {
                 ESP_LOGI("P1", "P1 message was invalid");
             }
         }//if len>0;
-
-        //Release the memory if a wrong message is received:
-        else {
-            free(data);
-        }//else (if(len>0))
+        //Release the data from the memory buffer:
+        free(data);
 
         int64_t lTimeAfterP1Read = esp_timer_get_time();
         int64_t lTimeDiffMilliSeconds = (lTimeAfterP1Read - lP1ReadStartTime) / 1000;
 
-        vTaskDelay ((P1_MEASUREMENT_INTERVAL_MS - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
+        vTaskDelay((P1_READ_INTERVAL - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
     } //while(1) - Never ending Task
 } //void read_P1
 
@@ -258,6 +239,7 @@ void buttonPressDuration(void *args) {
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     halfSeconds++;
                     if (halfSeconds == 19) {
+                        //Delete Wi-Fi
                         ESP_LOGI("ISR", "Button held for over 10 seconds\n");
                         char blinkArgs[2] = { 5, LED_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
@@ -268,9 +250,11 @@ void buttonPressDuration(void *args) {
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
                     //If the button gets released before 10 seconds have passed:
+                    //Send ESP-Now channel:
                     else if (gpio_get_level(BUTTON_P1)) {
                         char blinkArgs[2] = { 5, LED_STATUS };
                         xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
+                        xTaskCreatePinnedToCore(sendEspNowChannel, "pair_sensor", 2048, NULL, 15, NULL, 1); //Send data in relatively high priority task
                     }
                 } //while(!gpio_level)
             }
@@ -282,29 +266,11 @@ void buttonPressDuration(void *args) {
                     vTaskDelay(500 / portTICK_PERIOD_MS);
                     halfSeconds++;
                     if (halfSeconds == 19) {
-                        ESP_LOGI("ISR", "Button held for over 10 seconds\n");
-                        char blinkArgs[2] = { 5, LED_ERROR };
-                        xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                        esp_err_t err;
-                        nvs_handle_t channelHandle;
-                        err = nvs_open("twomes_storage", NVS_READWRITE, &channelHandle);
-                        if (err != ESP_OK) {
-                            ESP_LOGE("CHANNEL", "Failed to open NVS twomes_storage: %s", esp_err_to_name(err));
-                        }
-                        err = nvs_erase_key(channelHandle, "espnowchannel");
-                        if (err != ESP_OK) ESP_LOGI("CHANNEL", "Failed to erase channel");
-                        else {
-                            nvs_commit(channelHandle);
-                            ESP_LOGI("CHANNEL", "deleted channel from NVS");
-                            vTaskDelay(1000 / portTICK_PERIOD_MS);
-                            esp_restart(); //reboot device to generate a new ESP-Now channel
-                        }
+                        //Long press button 2
                     } //if (halfSeconds == 19)
                     //If the button gets released before 10 seconds have passed:
                     else if (gpio_get_level(BUTTON_P2)) {
-                        char blinkArgs[2] = { 5, LED_STATUS };
-                        xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                        xTaskCreatePinnedToCore(sendEspNowChannel, "pair_sensor", 2048, NULL, 15, NULL, 1); //Send data in relatively high priority task
+
                     }
                 } //while(!gpio_level)
             }

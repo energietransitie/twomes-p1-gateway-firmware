@@ -1,5 +1,4 @@
 #include "P1Config.h"
-#define LOG_LOCAL_LEVEL 3
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */

@@ -1,7 +1,29 @@
 #define DEBUG 1
-#define CUSTOM_IO 1
+
 //Generic Twomes Firmware
 #include "generic_esp_32.h"
+
+#ifdef CONFIG_WITH_ROOMCO2_SATELLITE
+    #ifdef CONFIG_WITH_BOILER_SATELLITE
+    const char *device_type_name = "DSMR-P1-gateway-TinTsTrCO2";
+    #else
+    const char *device_type_name = "DSMR-P1-gateway-TinCO2";
+    #endif
+#elif CONFIG_WITH_ROOM_SATELLITE
+    #ifdef CONFIG_WITH_BOILER_SATELLITE
+    const char *device_type_name = "DSMR-P1-gateway-TinTsTr";
+    #else
+    const char *device_type_name = "DSMR-P1-gateway-Tin";
+    #endif
+#else
+    #ifdef CONFIG_WITH_BOILER_SATELLITE
+    const char *device_type_name = "DSMR-P1-gateway-TsTr";
+    #else
+    const char *device_type_name = "DSMR-P1-gateway";
+    #endif
+#endif
+
+static const char *TAG = "Twomes P1 Gateway ESP32";
 
 //To create the JSON and read the P1 port
 #include "P1Config.h"
@@ -15,19 +37,11 @@
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 
-#define LOG_LEVEL_LOCAL 4
 
-#define P1_READ_INTERVAL 5 * 60 * 1000 //Interval to read P1 data in milliseconds (10 minuites)
-
-
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-#pragma message "Building devicetype: "  STR(DEVICE_TYPE)
-const char *device_type_name = DEVICE_TYPE;
+#define P1_MEASUREMENT_INTERVAL_MS 5 * 60 * 1000 //milliseconds (5 min * 60  s/min * 1000 ms/s)
 
 #define DEBUGHEAP //Prints free heap size to serial port on a fixed interval
 
-static const char *TAG = "Twomes P1 Gateway ESP32";
 
 //Interrupt Queue Handler:
 static xQueueHandle gpio_evt_queue = NULL;
@@ -43,7 +57,7 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
 void pingHeap(void *);
 #endif
 // void blink(void *args);
-void buttonPressDuration(void *args);
+void buttonPressHandler(void *args);
 void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length);
 void read_P1(void *args);
 // TODO move this to P1Config if possible:
@@ -60,11 +74,11 @@ void app_main(void) {
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     //Create interrupt handler task:
-    xTaskCreatePinnedToCore(buttonPressDuration, "buttonPressDuration", 4096, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(buttonPressHandler, "handle_button_pressed", 4096, NULL, 10, NULL, 1);
     gpio_install_isr_service(0);
     //Attach pushbuttons to gpio ISR handler:
-    gpio_isr_handler_add(BUTTON_P1, gpio_isr_handler, (void *)BUTTON_P1);
-    gpio_isr_handler_add(BUTTON_P2, gpio_isr_handler, (void *)BUTTON_P2);
+    // gpio_isr_handler_add(BUTTON_SW2, gpio_isr_handler, (void *)BUTTON_SW2);
+    gpio_isr_handler_add(BUTTON_SW3, gpio_isr_handler, (void *)BUTTON_SW3);
 
 
     gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
@@ -91,14 +105,18 @@ void app_main(void) {
 
 
     //Create "forever running" tasks:
-    xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 16384, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(&heartbeat_task, "twomes_heartbeat", 16384, NULL, 1, NULL, 1);
+
+    xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 16384, NULL, 10, NULL, 1);
+
     xTaskCreatePinnedToCore(espnow_available_task, "espnow_poll", 4096, NULL, 11, NULL, 1);
+
     ESP_LOGI(TAG, "Waiting 5  seconds before initiating next measurement intervals");
     vTaskDelay(5000 / portTICK_PERIOD_MS); // wait 5 seconds before initiating next measurement intervals
 
     ESP_LOGI(TAG, "Starting timesync task");
     xTaskCreatePinnedToCore(&timesync_task, "timesync_task", 4096, NULL, 1, NULL, 1);
+
 #if defined(DEBUGHEAP)
     xTaskCreatePinnedToCore(pingHeap, "ping_Heap", 2048, NULL, 1, NULL, 1);
 #endif
@@ -144,7 +162,7 @@ void read_P1(void *args) {
                 //Start the scanf one char after the end-of-message symbol (location of CRC16), and read a 4-symbol hex number
                 sscanf(p1MessageEnd + 1, "%4X", &receivedCRC);
                 //Allocate memory to copy the trimmed message into
-                uint8_t *p1Message = malloc(P1_MESSAGE_SIZE);
+                uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
                 //Trim the message to only include 1 full P1 port message:
                 memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
                 p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
@@ -176,7 +194,7 @@ void read_P1(void *args) {
                         //If a measurement could not be read, print to serial terminal which one was (the first that was) missing
                         printP1Error(result);
                         //Blink error LED twice to indicate error to user
-                        char blinkArgs[2] = { 2, LED_ERROR };
+                        char blinkArgs[2] = { 2, RED_LED_D1_ERROR };
                         xTaskCreatePinnedToCore(blink, "CRCerrorBlink", 768, (void *)blinkArgs, 10, NULL, 1);
                     }
                     //Start decoding the P1 message:
@@ -184,11 +202,11 @@ void read_P1(void *args) {
                 //if CRC does not match:
                 else {
                     //Log received and calculated CRC for debugging and flash the Error LED
-                    ESP_LOGI("ERROR - P1", "CRC DOES NOT MATCH");
+                    ESP_LOGE("ERROR - P1", "CRC DOES NOT MATCH");
                     ESP_LOGD("ERROR - P1", "Received CRC %4X but calculated CRC %4X", receivedCRC, calculatedCRC);
 
                     //Blink error LED twice
-                    char blinkArgs[2] = { 2, LED_ERROR };
+                    char blinkArgs[2] = { 2, RED_LED_D1_ERROR };
                     xTaskCreatePinnedToCore(blink, "CRCerrorBlink", 768, (void *)blinkArgs, 10, NULL, 1);
                 } //else (CRC check)
 
@@ -196,92 +214,80 @@ void read_P1(void *args) {
                 free(p1Message);
             }//if(p1MessageEnd != NULL)
             else {
-                ESP_LOGI("P1", "P1 message was invalid");
+                ESP_LOGE("P1", "P1 message was invalid");
             }
-        }//if len>0;
+        } else {
+            ESP_LOGI("P1", "No P1 message found");
+        }
+        //if len>0;
         //Release the data from the memory buffer:
         free(data);
 
         int64_t lTimeAfterP1Read = esp_timer_get_time();
         int64_t lTimeDiffMilliSeconds = (lTimeAfterP1Read - lP1ReadStartTime) / 1000;
 
-        vTaskDelay((P1_READ_INTERVAL - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
+        vTaskDelay((P1_MEASUREMENT_INTERVAL_MS - lTimeDiffMilliSeconds) / portTICK_PERIOD_MS); //This should be calibrated to check for the time spent calculating the data
     } //while(1) - Never ending Task
 } //void read_P1
 
 #if defined(DEBUGHEAP)
-//For debugging: print the amount of free memory
+//For debugging: print the amount of free memory every minute
 void pingHeap(void *args) {
     while (1) {
-        ESP_LOGI("Heap", "I am alive! Free heap size: %u bytes", esp_get_free_heap_size());
-        vTaskDelay(60000 / portTICK_PERIOD_MS);
+        ESP_LOGD("Heap", "I am alive! Free heap size: %u bytes", esp_get_free_heap_size());
+        vTaskDelay(1 * 60 * 1000 / portTICK_PERIOD_MS);
     }
 } //void pingAlive
 #endif
 
  /**
   * Check for input of buttons and the duration
-  * if the press duration was more than 5 seconds, erase the flash memory to restart provisioning
+  * if the press duration was more than 10 seconds, erase the flash memory to restart provisioning
   * otherwise, blink the status LED (and possibly run another task (sensor provisioning?))
  */
-void buttonPressDuration(void *args) {
+void buttonPressHandler(void *args) {
     uint32_t io_num;
     while (1) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay
+            vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay: nothing happens if user presses button for less than 100 ms = 0.1s
 
-            //INTERRUPT HANDLER BUTTON P1
-            if (io_num == BUTTON_P1) {
-                //Use half seconds to make button feel more responsive
+            //INTERRUPT HANDLER BUTTON SW3
+            if (io_num == BUTTON_SW3) {
                 uint8_t halfSeconds = 0;
-                //Check if the button is held down for over 10 seconds:
-                while (!gpio_get_level(BUTTON_P1)) {
-                    vTaskDelay(500 / portTICK_PERIOD_MS);
+                //Determine length of button press before taking action
+                while (!gpio_get_level(BUTTON_SW3)) {
+                    //Button SW3 is (still) pressed
+                    vTaskDelay(500 / portTICK_PERIOD_MS); //Wait for 0.5s
                     halfSeconds++;
-                    if (halfSeconds == 19) {
-                        //Delete Wi-Fi
-                        ESP_LOGI("ISR", "Button held for over 10 seconds\n");
-                        char blinkArgs[2] = { 5, LED_ERROR };
+                    ESP_LOGD(TAG, "Button SW3 has been pressed for %u half-seconds now", halfSeconds);
+                    if (halfSeconds >= LONG_BUTTON_PRESS_DURATION) {
+                        //Long press on SW3 is for clearing Wi-Fi provisioning memory:
+                        ESP_LOGI("ISR", "Long-button press detected on SW3; resetting Wi-Fi provisioning and restarting device");
+                        char blinkArgs[2] = { 5, RED_LED_D1_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
-                        //Long press on P1 is for clearing provisioning memory:
                         esp_wifi_restore();
-                        vTaskDelay(1000 / portTICK_PERIOD_MS); //Wait for blink to finish
-                        esp_restart();                         //software restart, to get new provisioning. Sensors do NOT need to be paired again when gateway is reset (MAC address does not change)
+                        vTaskDelay(5 * (200+200) * 1000 / portTICK_PERIOD_MS); //Wait 1s for blink to finish
+                        esp_restart();                         //software restart, to enable linking to new Wi-Fi router. Sensors do NOT need to be paired again: MAC address of P1-gateway does not change)
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
-                    //If the button gets released before 10 seconds have passed:
-                    //Send ESP-Now channel:
-                    else if (gpio_get_level(BUTTON_P1)) {
-                        char blinkArgs[2] = { 5, LED_STATUS };
-                        xTaskCreatePinnedToCore(blink, "blink shortpress", 768, (void *)blinkArgs, 10, NULL, 1);
+                    else if (gpio_get_level(BUTTON_SW3)) {
+                        //Button SW3 is released
+                        //Short press on SW3 is for coupling with a satellite by sending the ESP-NOW channel number on channel 0:
+                        ESP_LOGI("ISR", "Short button press detected on SW3");
+                        char blinkArgs[2] = { 5, GREEN_LED_D2_STATUS };
+                        xTaskCreatePinnedToCore(blink, "blink_green_LED_5_times", 768, (void *)blinkArgs, 10, NULL, 1);
                         xTaskCreatePinnedToCore(sendEspNowChannel, "pair_sensor", 2048, NULL, 15, NULL, 1); //Send data in relatively high priority task
                     }
                 } //while(!gpio_level)
             }
-            //INTERRUPT HANDLER BUTTON P2
-            if (io_num == BUTTON_P2) {
-                uint8_t halfSeconds = 0;
-                //Long press on P1 is for clearing channel memory:
-                while (!gpio_get_level(BUTTON_P2)) {
-                    vTaskDelay(500 / portTICK_PERIOD_MS);
-                    halfSeconds++;
-                    if (halfSeconds == 19) {
-                        //Long press button 2
-                    } //if (halfSeconds == 19)
-                    //If the button gets released before 10 seconds have passed:
-                    else if (gpio_get_level(BUTTON_P2)) {
-
-                    }
-                } //while(!gpio_level)
-            }
         }     //if(xQueueReceive)
-    }         //while(1)
-} //task buttonDuration
+    }  //while(1)
+} // buttonPressHandler
 
 //Callback function when receiving ESP-Now data:
 void onDataReceive(const uint8_t *macAddress, const uint8_t *payload, int length) {
 
-    uint8_t espnowBlinks[2] = { 2, LED_STATUS }; //Blink status LED twice on receive:
+    uint8_t espnowBlinks[2] = { 2, GREEN_LED_D2_STATUS }; //Blink status LED twice on receive:
     xTaskCreatePinnedToCore(blink, "blinkESPNOW", 786, espnowBlinks, 1, NULL, 1);
     ESP_LOGI(TAG, "RECEIVED ESP_NOW MESSAGE");
 

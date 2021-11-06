@@ -1,9 +1,21 @@
 #include "P1Config.h"
+
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */
 void initP1UART() {
     //UART Configuration for P1-Port reading:
+    #ifdef DSMR2or3
+    //9600 baud 7E1, even parity
+    uart_config_t uart_config = {
+        .baud_rate = 9600,
+        .data_bits = UART_DATA_7_BITS,
+        .parity = UART_PARITY_EVEN,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 122,
+    };
+    #else //DSMR4 and DSMR5
     //115200 baud, 8n1, no parity, no HW flow control
     uart_config_t uart_config = {
         .baud_rate = 115200,
@@ -13,6 +25,7 @@ void initP1UART() {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
     };
+    #endif
     ESP_ERROR_CHECK(uart_param_config(P1PORT_UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(P1PORT_UART_NUM, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_set_line_inverse(P1PORT_UART_NUM, UART_SIGNAL_RXD_INV | UART_SIGNAL_IRDA_RX_INV)); //Invert RX data
@@ -338,8 +351,8 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
         //Read the version number:
         sscanf(dsmrPos, "1-3:0.2.8(%hhu", &(p1Struct->dsmrVersion)); //Read DSMR version as unsigned char
     }
-    else
-        return P1_ERROR_DSMR_NOT_FOUND; //DSMR version not found
+    //else
+      //  return P1_ERROR_DSMR_NOT_FOUND; //DSMR version not found is not an error
 
     //elecUsedT1 OBIS reference: 1-0:1.8.1
     char *elecUsedT1Pos = strstr(p1String, "1-0:1.8.1");
@@ -380,9 +393,25 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     if (elecTimePos != NULL) {
         sscanf(elecTimePos, "0-0:1.0.0(%13s", p1Struct->timeElecMeasurement);
         p1Struct->timeElecMeasurement[13] = 0; //add a zero terminator at the end to read as string
+    } 
+#ifdef DSMR2OR3
+    //DSMR 2.2 had different layout of gas timestap and gas reading
+    //Gas reading OBIS: 0-n:24.3.0 //n can vary depending on which channel it is installed
+    char *gasTimePos = strstr(p1String, "0-1:24.3.0");
+    if (gasTimePos != NULL) {
+        sscanf(gasTimePos, "0-1:24.3.0(%12s)", p1Struct->timeGasMeasurement);
+        p1Struct->timeGasMeasurement[12] = 0; //Add a null terminator to print it as a string
     }
-
-    //Gas reading OBIS: 0-n:24.2.1 //n can vary depending on which channel it is installed
+    else
+        return P1_ERROR_GAS_READING_NOT_FOUND;
+    char *gasPos = strstr(p1String, "m3)");
+    if (gasTimePos != NULL) {
+        sscanf(gasPos, "m3)\n(%lf)", &p1Struct->gasUsage);
+    }
+    else
+        return P1_ERROR_GAS_READING_NOT_FOUND;
+#else
+//Gas reading OBIS: 0-n:24.2.1 //n can vary depending on which channel it is installed
     char *gasPos = strstr(p1String, "0-1:24.2.1");
     if (gasPos != NULL) {
         sscanf(gasPos, "0-1:24.2.1(%13s)(%lf)", p1Struct->timeGasMeasurement, &p1Struct->gasUsage);
@@ -390,7 +419,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     }
     else
         return P1_ERROR_GAS_READING_NOT_FOUND;
-
+#endif
     //If none of the statements reached an "else" all measurements were read correctly!
     return P1_READ_OK;
 }

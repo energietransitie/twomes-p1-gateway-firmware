@@ -135,8 +135,8 @@ void read_P1(void *args) {
         ESP_LOGI("P1", "Attempting to read P1 Port");
         //DRQ pin has inverter to pull up to 5V, which makes it active low:      
         gpio_set_level(PIN_DRQ, 0);
-        //Wait for 11 seconds to ensure a message is read even on a DSMR4.x device:
-        vTaskDelay(11000 / portTICK_PERIOD_MS);
+        //Wait for 18 seconds to ensure a message is read even on a DSMR4.x device:
+        vTaskDelay(18000 / portTICK_PERIOD_MS);
         //Write DRQ pin low again (otherwise P1 port keeps transmitting every second);
         gpio_set_level(PIN_DRQ, 1);
 
@@ -164,12 +164,16 @@ void read_P1(void *args) {
                 //Allocate memory to copy the trimmed message into
                 uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
                 //Trim the message to only include 1 full P1 port message:
-                memcpy(p1Message, p1MessageStart, (p1MessageEnd - p1MessageStart) + 1);
-                p1Message[p1MessageEnd - p1MessageStart + 1] = 0; //Add zero terminator to end of message
+                len = (int) (p1MessageEnd - p1MessageStart) + 1;
+                memcpy(p1Message, p1MessageStart, len);
+                p1Message[len] = 0; //Add zero terminator to end of message
+                ESP_LOGD("P1", "Trimmed message length: %d bytes)", len);
 
                 //Calculate the CRC of the trimmed message:
-                unsigned int calculatedCRC = CRC16(0x0000, p1Message, (int)(p1MessageEnd - p1MessageStart + 1));
-
+                unsigned int calculatedCRC = CRC16(0x0000, p1Message, len);
+                #ifdef DSMR2OR3
+                  receivedCRC = calculatedCRC;
+                #endif
                 //Check if CRC match:
                 if (calculatedCRC == receivedCRC) {
                     //log received CRC and calculated CRC for debugging

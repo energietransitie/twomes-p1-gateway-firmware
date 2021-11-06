@@ -78,7 +78,7 @@ void app_main(void) {
     gpio_install_isr_service(0);
     //Attach pushbuttons to gpio ISR handler:
     // gpio_isr_handler_add(BUTTON_SW2, gpio_isr_handler, (void *)BUTTON_SW2);
-    gpio_isr_handler_add(BUTTON_SW3, gpio_isr_handler, (void *)BUTTON_SW3);
+    gpio_isr_handler_add(BUTTON_GPIO12_SW3, gpio_isr_handler, (void *)BUTTON_GPIO12_SW3);
 
 
     gpio_set_level(PIN_DRQ, 1);        //P1 data read is active low.
@@ -252,10 +252,10 @@ void buttonPressHandler(void *args) {
             vTaskDelay(100 / portTICK_PERIOD_MS); //Debounce delay: nothing happens if user presses button for less than 100 ms = 0.1s
 
             //INTERRUPT HANDLER BUTTON SW3
-            if (io_num == BUTTON_SW3) {
+            if (io_num == BUTTON_GPIO12_SW3) {
                 uint8_t halfSeconds = 0;
                 //Determine length of button press before taking action
-                while (!gpio_get_level(BUTTON_SW3)) {
+                while (!gpio_get_level(BUTTON_GPIO12_SW3)) {
                     //Button SW3 is (still) pressed
                     vTaskDelay(500 / portTICK_PERIOD_MS); //Wait for 0.5s
                     halfSeconds++;
@@ -270,7 +270,7 @@ void buttonPressHandler(void *args) {
                         esp_restart();                         //software restart, to enable linking to new Wi-Fi router. Sensors do NOT need to be paired again: MAC address of P1-gateway does not change)
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
-                    else if (gpio_get_level(BUTTON_SW3)) {
+                    else if (gpio_get_level(BUTTON_GPIO12_SW3)) {
                         //Button SW3 is released
                         //Short press on SW3 is for coupling with a satellite by sending the ESP-NOW channel number on channel 0:
                         ESP_LOGI("ISR", "Short button press detected on SW3");

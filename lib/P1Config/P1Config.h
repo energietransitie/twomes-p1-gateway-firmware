@@ -30,31 +30,17 @@
 #pragma message "Using P1Config version "  STR(P1CONFIG_VERSION)
 
   //Pin definitions:
-#define BUTTON_P1 GPIO_NUM_0
-#define BUTTON_P2 GPIO_NUM_12
-#define LED_ERROR GPIO_NUM_15
-#define LED_STATUS GPIO_NUM_14
+#define BUTTON_SW3 GPIO_NUM_12
+#define RED_LED_D1_ERROR GPIO_NUM_15
+#define GREEN_LED_D2_STATUS GPIO_NUM_14
 #define PIN_DRQ GPIO_NUM_17
-#define OUTPUT_BITMASK ((1ULL << LED_ERROR) | (1ULL << LED_STATUS) | (1ULL << PIN_DRQ))
-#define INPUT_BITMASK ((1ULL << BUTTON_P1) | (1ULL << BUTTON_P2))
+#define OUTPUT_BITMASK ((1ULL << RED_LED_D1_ERROR) | (1ULL << GREEN_LED_D2_STATUS) | (1ULL << PIN_DRQ))
+#define INPUT_BITMASK ((1ULL << BUTTON_SW3))
 
 //UART defines
 #define P1_BUFFER_SIZE 2048
 #define P1PORT_UART_NUM UART_NUM_2
 
-//DeviceTypes
-#define DEVICETYPE_P1_ONLY "DSMR-P1-gateway"
-#define DEVICETYPE_P1_WITH_SENSORS "DSMR-P1-gateway-TinTsTr"
-#define DEVICETYPE_P1_WITH_SENSORS_AND_CO2 "DSMR-P1-gateway-TinTsTrCO2"
-#define DEVICETYPE_P1_WITH_CO2 "DSMR-P1-gateway-TinCO2"
-
-//HTTP and JSON
-#define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl"
-#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
-
-#define ACTIVATION_URL TWOMES_SERVER"/device/activate"
-#define VARIABLE_INTERVAL_URL "/device/measurements/variable-interval"
-#define FIXED_INTERVAL_URL "/device/measurements/fixed-interval"
 
 #define JSON_BUFFER_SIZE 2048
 
@@ -136,19 +122,8 @@ typedef struct channelListstruct {
     uint8_t channels[DEFAULT_SCAN_LIST_SIZE];
 }channelList;
 
-//Data type intervals:
-//Boiler    - 3m20s
-//HB        - 10m
-//Roomtemp  - 
-//Co2       - 
-//P1        - 
-//Presence  - 
-#define INTERVAL_BOILER     200 //3m20
-#define INTERVAL_ROOM           
-#define INTERVAL_CO2            
-#define INTERVAL_HB        3600 //1 hour
-#define INTERVAL_PRESENCE   300 //5m
-#define INTERVAL_P1         900 //15min
+
+
 
 
 /** ====== GLOBAL VARIABLES ============== */

@@ -1,5 +1,4 @@
 #include "P1Config.h"
-#define LOG_LOCAL_LEVEL 3
 /**
  * @brief Initialise UART "P1PORT_UART_NUM" for P1 receive
  */
@@ -659,7 +658,7 @@ void postESPNOWbackoffice(void *args) {
 
     //Post the JSON data to the backoffice
     char response[128] = "";
-    int responsecode = upload_data_to_server((const char *)FIXED_INTERVAL_URL, POST_WITH_BEARER, postJSON, response, sizeof response);
+    int responsecode = upload_data_to_server(FIXED_INTERVAL_UPLOAD_ENDPOINT, POST_WITH_BEARER, postJSON, response, sizeof response);
     ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
 
     //Delay to give Wi-Fi time to finish up after post
@@ -697,7 +696,7 @@ void postP1backoffice(void *args) {
     //create buffer to store the response
     char response[128] = "\0";
     //POST
-    int responsecode = upload_data_to_server(VARIABLE_INTERVAL_URL, POST_WITH_BEARER, postJSON, response, sizeof(response));
+    int responsecode = upload_data_to_server(VARIABLE_UPLOAD_ENDPOINT, POST_WITH_BEARER, postJSON, response, sizeof(response));
     //Print response and code:
     ESP_LOGI("HTTPS", "Response code: %d: %s", responsecode, response);
     vTaskDelay(1000 / portTICK_PERIOD_MS);

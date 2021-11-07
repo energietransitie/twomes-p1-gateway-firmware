@@ -162,7 +162,7 @@ void read_P1(void *args) {
                 //Start the scanf one char after the end-of-message symbol (location of CRC16), and read a 4-symbol hex number
                 sscanf(p1MessageEnd + 1, "%4X", &receivedCRC);
                 //Allocate memory to copy the trimmed message into
-                uint8_t *p1Message = malloc(P1_BUFFER_SIZE);
+                uint8_t *p1Message = malloc(P1_MESSAGE_SIZE);
                 //Trim the message to only include 1 full P1 port message:
                 len = (int) (p1MessageEnd - p1MessageStart) + 1;
                 memcpy(p1Message, p1MessageStart, len);

@@ -34,6 +34,8 @@ To deploy the firmware, in addition to the [generic prerequisites for deploying 
 * Follow the [generic Twomes firmware upload instructions ](https://github.com/energietransitie/twomes-generic-esp-firmware#device-preparation-step-1a-uploading-firmware-to-esp32), with the exceptions mentioned below:
 	* When you see the beginning of the sequence `Connecting ......_____......`, press and hold the button labeled `GPIO1 (SW2)` on the PCB, then briefly press the button labeled `RESET`, then release the button labeled `GPIO1 (SW2) `;
 	* You should see an indication that the firmware is being written to the device.
+	* When the upload is finished, view the serial output with a serial monitor tool like [PuTTY](https://www.chiark.greenend.org.uk/~sgtatham/putty/) or the utility of your IDE (115200 baud). Press `RESET (SW1)` shortly to  make sure the firmware boots. 
+
 
 ### Device Preparation step 2 and further 
 Please follow the [generic firmware instructions for these steps](https://github.com/energietransitie/twomes-generic-esp-firmware#device-preparation-step-2-establishing-a-device-name-and-device-activation_token). 

@@ -43,7 +43,7 @@ Please follow the [generic firmware instructions for these steps](https://github
 ## Pairing satellites
 Pairing a satellite to the  [Twomes P1 Gateway measurement device](https://github.com/energietransitie/twomes-p1-gateway-firmware) works as follows:
 * Place the battery in the satellite module, or remove the [insulatting battery pull tab](https://nl.mouser.com/ProductDetail/Keystone-Electronics/117?qs=sGAEpiMZZMv0NwlthflBi4fkPBGNPNEM5y3HK%252B53UQM%3D), make sure it is near the gateway device to be able to see whether the pairing is successful.
-* On the satellite module, pressthe `RESET (SW1)` button (labeled `R` on the enclosure); A green LED will start blink for 20 seconds to indicate that the satellite module is in pairing mode, i.e. listens (on 2.4 GHz channel 0) to the gateway device telling it which ESP-NOW channel to use after pairing.
+* On the satellite module, shortly press the `RESET (SW1)` button (labeled `R` on the enclosure); A green LED will start blink for 20 seconds to indicate that the satellite module is in pairing mode, i.e. listens (on 2.4 GHz channel 0) to the gateway device telling it which ESP-NOW channel to use after pairing.
 * On the gateway device, within these 20 seconds, press the `GPIO12 (SW2)` (labeled `K` on the enclosure, which stands for the Dutch word "Koppelen"). The gateway device now sends, via 2.4 GHz channel 0, which channel the gateway module should use for subsequent ESP-NOW messages. The green LED on the gateway device blinks shortly during this transmission.
 * On the satellite module, when the channel number received, the green LED will turn on steady for about 5 seconds.
 * This procedure can be repeated if needed (e.g., when the gateway device is connected to the internet via another Wi-Fi network).

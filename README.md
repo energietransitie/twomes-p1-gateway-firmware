@@ -4,8 +4,8 @@ Firmware for the Twomes P1 Gateway measurement device.
 ## Table of contents
 * [General info](#general-info)
 * [Deploying](#deploying)
-* [Developing](#developing)
 * [Pairing satellites](#pairing-satellites) 
+* [Developing](#developing)
 * [Features](#features)
 * [Status](#status)
 * [License](#license)
@@ -40,6 +40,14 @@ To deploy the firmware, in addition to the [generic prerequisites for deploying 
 ### Device Preparation step 2 and further 
 Please follow the [generic firmware instructions for these steps](https://github.com/energietransitie/twomes-generic-esp-firmware#device-preparation-step-2-establishing-a-device-name-and-device-activation_token). 
 
+## Pairing satellites
+Pairing a satellite to the  [Twomes P1 Gateway measurement device](https://github.com/energietransitie/twomes-p1-gateway-firmware) works as follows:
+* Place the battery in the satellite module, or remove the [insulatting battery pull tab](https://nl.mouser.com/ProductDetail/Keystone-Electronics/117?qs=sGAEpiMZZMv0NwlthflBi4fkPBGNPNEM5y3HK%252B53UQM%3D), make sure it is near the gateway device to be able to see whether the pairing is successful.
+* On the satellite module, pressthe `RESET (SW1)` button (labeled `R` on the enclosure); A green LED will start blink for 20 seconds to indicate that the satellite module is in pairing mode, i.e. listens (on 2.4 GHz channel 0) to the gateway device telling it which ESP-NOW channel to use after pairing.
+* On the gateway device, within these 20 seconds, press the `GPIO12 (SW2)` (labeled `K` on the enclosure, which stands for the Dutch word "Koppelen"). The gateway device now sends, via 2.4 GHz channel 0, which channel the gateway module should use for subsequent ESP-NOW messages. The green LED on the gateway device blinks shortly during this transmission.
+* On the satellite module, when the channel number received, the green LED will turn on steady for about 5 seconds.
+* This procedure can be repeated if needed (e.g., when the gateway device is connected to the internet via another Wi-Fi network).
+
 ## Developing 
 This section describes how you can change the source code using a development environment and compile the source code into a binary release of the firmware that can be depoyed, either via the development environment, or via the method described in the section [Deploying](#deploying).
 
@@ -47,13 +55,6 @@ Please see the [developing section of the generig Twomes firmware](https://githu
 * When you see the beginning of the sequence `Connecting ....___....`, press and hold the button labeled `GPIO0 (SW2)` on the PCB, then briefly press the button labeled `RESET (SW1)`, then release the button labeled `GPIO0 (SW2)`;
 * You should see an indication that the firmware is being written to the device.
 
-## Pairing satellites
-Pairing a satellite to the  [Twomes P1 Gateway measurement device](https://github.com/energietransitie/twomes-p1-gateway-firmware) works as follows:
-* Place the battery in the satellite module, make sure it is near the gateway device to be able to see whether the pairing is successful.
-* On the satellite module, pressthe `RESET (SW1)` button (labeled `R` on the enclosure); A green LED will start blink for 20 seconds to indicate that the satellite module is in pairing mode, i.e. listens (on 2.4 GHz channel 0) to the gateway device telling it which ESP-NOW channel to use after pairing.
-* On the gateway device, within these 20 seconds, press the `GPIO12 (SW2)` (labeled `K` on the enclosure, which stands for the Dutch word "Koppelen"). The gateway device now sends, via 2.4 GHz channel 0, which channel the gateway module should use for subsequent ESP-NOW messages. The green LED on the gateway device blinks shortly during this transmission.
-* On the satellite module, when the channel number received, the green LED will turn on steady for about 5 seconds.
-* This procedure can be repeated if needed (e.g., when the gateway device is connected to the internet via another Wi-Fi network).
 
 ## Features
 List of features ready and TODOs for future development (other than the [features of the generic Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#features)). 

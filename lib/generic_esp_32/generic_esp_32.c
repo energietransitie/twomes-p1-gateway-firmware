@@ -69,7 +69,7 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 } //gpio_isr_handler
 
-//Function to initialise the buttons and LEDs on the gateway, with interrupts on the buttons
+//Function to initialise the buttons and LEDs on the device, with interrupts on the buttons
 void initGPIO() {
     gpio_config_t io_conf;
     //CONFIGURE OUTPUTS:
@@ -115,7 +115,7 @@ void buttonPressHandlerGeneric(void *args) {
                         xTaskCreatePinnedToCore(blink, "blink_5_times_red", 768, (void *)blinkArgs, 10, NULL, 1);
                         esp_wifi_restore();
                         vTaskDelay(5 * (200+200) / portTICK_PERIOD_MS); //Wait for blink to finish
-                        esp_restart();                         //software restart, to enable linking to new Wi-Fi network. Sensors do NOT need to be paired again: MAC address of P1-gateway does not change)
+                        esp_restart();                         //software restart, to enable linking to new Wi-Fi network.
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
                     else if (gpio_get_level(BOOT)) {
@@ -133,7 +133,7 @@ void buttonPressHandlerGeneric(void *args) {
 /**Blink LEDs to test GPIO:
  * Pass two arguments in uint8_t array:
  * argument[0] = amount of blinks
- * argument[1] = pin to blink on (LED_STATUS or LED_ERROR)
+ * argument[1] = pin to blink on (LED_STATUS or RED_LED_ERROR)
  */
 void blink(void *args) {
     uint8_t *arguments = (uint8_t *)args;
@@ -560,7 +560,7 @@ void timesync(bool already_connected) {
         if (connect_wifi("timesync")) {
 
             ESP_LOGD(TAG, "Waiting for IP connection...");
-            xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+            xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY); 
             //Wait to make extra sure Wi-Fi is connected and stable
             vTaskDelay(HTTPS_PRE_WAIT_MS / portTICK_PERIOD_MS);
             ESP_LOGD(TAG, "Waiting for IP connection... done; initiating timesync call");
@@ -736,7 +736,7 @@ void activate_device() {
     }
 }
 
-int post_https(char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size) {
+int post_https(const char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size) {
     int connect_retry_counter = 0;
     int upload_retry_counter = 0;
     int content_length = 0;
@@ -790,11 +790,11 @@ int post_https(char *endpoint, bool use_bearer, bool already_connected, char *da
     esp_http_client_set_post_field(client, data, strlen(data));
     ESP_LOGD(TAG, "Free heap: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
 
-    if (!already_connected) {
-        connect_success = connect_wifi(endpoint);
+    if (!already_connected){
+        connect_success = connect_wifi(endpoint); 
         while (!connect_success && ++connect_retry_counter < WIFI_CONNECT_RETRIES) {
             ESP_LOGE(TAG, "Failed to connect to Wi-Fi (%d/%d) at %s", connect_retry_counter, WIFI_CONNECT_RETRIES, esp_log_system_timestamp());
-            connect_success = connect_wifi(endpoint);
+            connect_success = connect_wifi(endpoint); 
         }
 
         if (!connect_success) {
@@ -810,7 +810,7 @@ int post_https(char *endpoint, bool use_bearer, bool already_connected, char *da
         }
 
         ESP_LOGD(TAG, "Waiting for IP connection...");
-        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY); 
         ESP_LOGD(TAG, "Waiting for IP connection... done");
 
         //Wait to make extra sure Wi-Fi is connected and stable
@@ -889,7 +889,7 @@ int post_https(char *endpoint, bool use_bearer, bool already_connected, char *da
     return status_code;
 }
 
-int upload_data_to_server(char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size) {
+int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size) {
     return post_https(endpoint, use_bearer, NOT_ALREADY_CONNECTED, data, response_buf, resp_buf_size);
 }
 
@@ -935,7 +935,7 @@ wifi_prov_mgr_config_t initialize_provisioning() {
         #endif /* CONFIG_TWOMES_PROV_TRANSPORT_SOFTAP */
     };
     return config;
-    }
+}
 
 void start_provisioning(wifi_prov_mgr_config_t config, bool connect) {
     /* Initialize provisioning manager with the
@@ -1075,7 +1075,7 @@ bool disable_wifi(char *taskString) {
     }
 }
 
-bool disable_wifi_keeping_802_11_mutex() {
+bool disable_wifi_keeping_802_11_mutex(){
     if (esp_wifi_stop() == ESP_OK) {
         ESP_LOGD(TAG, "Disabled Wi-Fi without releasing 802.11 mutex");
         wifi_initialized = false;

@@ -35,7 +35,7 @@ void initP1UART() {
 /**
  * @brief Initalise pushbuttons, LEDs and Data-Request pin
  */
-void initGPIO() {
+void initGPIO_P1() {
     gpio_config_t io_conf;
     //CONFIGURE OUTPUTS:
     io_conf.intr_type = GPIO_INTR_DISABLE;

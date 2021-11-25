@@ -30,9 +30,9 @@
 #endif
 
 #define VERSION "V2.6.0"
-#define BOOT GPIO_NUM_0
-#define RED_LED_ERROR GPIO_NUM_19
-#define LONG_BUTTON_PRESS_DURATION 19 // halfseconds minus one (10 s * 2 halfseconds/s - 1); this constant specifies the number of half seconds minus one to wait
+#define BOOT   GPIO_NUM_0
+#define RED_LED_ERROR   GPIO_NUM_19
+#define LONG_BUTTON_PRESS_DURATION 19 // (10 s * 2 halfseconds - 1); this constant specifies the number of half seconds minus one to wait
 
 #define MAX_RESPONSE_LENGTH 100
 
@@ -69,8 +69,16 @@
 
 xSemaphoreHandle wireless_802_11_mutex;
 
+#ifdef CONFIG_TWOMES_TEST_SERVER
 #define TWOMES_SERVER_HOSTNAME "api.tst.energietransitiewindesheim.nl"
 #define TWOMES_SERVER "https://api.tst.energietransitiewindesheim.nl"
+#endif
+
+#ifdef CONFIG_TWOMES_PRODUCTION_SERVER
+#define TWOMES_SERVER_HOSTNAME "api.energietransitiewindesheim.nl"
+#define TWOMES_SERVER "https://api.energietransitiewindesheim.nl"
+#endif
+
 #define VARIABLE_UPLOAD_ENDPOINT "/device/measurements/variable-interval"
 #define FIXED_INTERVAL_UPLOAD_ENDPOINT "/device/measurements/fixed-interval"
 #define DEVICE_ACTIVATION_ENDPOINT "/device/activate"
@@ -117,8 +125,8 @@ void timesync(bool already_connected);
 void initialize_timezone(char *timezone);
 #define POST_WITH_BEARER true
 #define POST_WITHOUT_BEARER false
-int upload_data_to_server(char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
-int post_https(char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
+int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
+int post_https(const char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
 void upload_heartbeat(int hbcounter);
 void heartbeat_task(void *data);
 char *get_bearer();

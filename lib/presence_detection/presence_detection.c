@@ -20,12 +20,11 @@
 esp_gatt_if_t interface;
 
 esp_bd_addr_t phone = {0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F}; //example address
-esp_bd_addr_t phone2 = {0x7A, 0x8B, 0x9C, 0xAD, 0xAE, 0xBA}; //example address
-esp_bd_addr_t phone3 = {0xCA, 0xDB, 0xEC, 0xFD, 0xA1, 0xB2}; //example address
+esp_bd_addr_t phone1 = {0x7A, 0x8B, 0x9C, 0xAD, 0xAE, 0xBA}; //example address
 
-esp_bd_addr_t presence_addr_list[3] = {};
-int presence_addr_list_count = 3;
-presence_data result_list[3];
+esp_bd_addr_t presence_addr_list[2] = {};
+int presence_addr_list_count = 2;
+presence_data result_list[2];
 const char *TAG = "Twomes Presence Detection";
 int requesting_number = -1;
 bool requesting = false;
@@ -112,8 +111,7 @@ void initialize_presence_detection()
     initialize_bluetooth();
     initialize_timer(TIMER_GROUP_0, TIMER_0, true, 1000000);
     memcpy(presence_addr_list[0], phone, sizeof(esp_bd_addr_t));
-    memcpy(presence_addr_list[1], phone2, sizeof(esp_bd_addr_t));
-    memcpy(presence_addr_list[2], phone3, sizeof(esp_bd_addr_t));
+    memcpy(presence_addr_list[1], phone1, sizeof(esp_bd_addr_t));
 }
 
 //Send name request to private MAC adress given in mac_addr variable.

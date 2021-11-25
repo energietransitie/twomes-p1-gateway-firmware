@@ -137,7 +137,7 @@ typedef struct channelListstruct {
  //Init
 
 void initP1UART();
-void initGPIO();
+void initGPIO_P1();
 
 
 //P1 port read and parsing

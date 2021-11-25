@@ -25,6 +25,9 @@
 
 static const char *TAG = "Twomes P1 Gateway ESP32";
 
+#define BOOT_STARTUP_INTERVAL_MS (10 * 60) // milliseconds ( 10 s * 1000 ms/s)
+#define BOOT_STARTUP_INTERVAL_TXT "Wating 10 seconds before next measurement data series is started"
+
 //To create the JSON and read the P1 port
 #include "P1Config.h"
 #include <string.h>
@@ -69,7 +72,7 @@ void espnow_available_task(void *args);
 void app_main(void) {
     //INIT:
     initP1UART();                   //Setup P1 UART
-    initGPIO();                     //Setup GPIO
+    initGPIO_P1();                     //Setup GPIO
 
     //Attach interrupt handler to GPIO pins:
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -105,17 +108,26 @@ void app_main(void) {
 
 
     //Create "forever running" tasks:
+    ESP_LOGD(TAG, "Starting heartbeat task");
     xTaskCreatePinnedToCore(&heartbeat_task, "twomes_heartbeat", 16384, NULL, 1, NULL, 1);
 
     xTaskCreatePinnedToCore(read_P1, "uart_read_p1", 16384, NULL, 10, NULL, 1);
 
     xTaskCreatePinnedToCore(espnow_available_task, "espnow_poll", 4096, NULL, 11, NULL, 1);
 
-    ESP_LOGI(TAG, "Waiting 5  seconds before initiating next measurement intervals");
-    vTaskDelay(5000 / portTICK_PERIOD_MS); // wait 5 seconds before initiating next measurement intervals
+    ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
+    vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
 
     ESP_LOGI(TAG, "Starting timesync task");
     xTaskCreatePinnedToCore(&timesync_task, "timesync_task", 4096, NULL, 1, NULL, 1);
+
+    ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
+    vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
+
+    #ifdef CONFIG_TWOMES_PRESENCE_DETECTION
+    ESP_LOGD(TAG, "Starting presence detection");
+    start_presence_detection();
+    #endif
 
 #if defined(DEBUGHEAP)
     xTaskCreatePinnedToCore(pingHeap, "ping_Heap", 2048, NULL, 1, NULL, 1);

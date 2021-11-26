@@ -25,7 +25,7 @@
 
 static const char *TAG = "Twomes P1 Gateway ESP32";
 
-#define BOOT_STARTUP_INTERVAL_MS (10 * 60) // milliseconds ( 10 s * 1000 ms/s)
+#define BOOT_STARTUP_INTERVAL_MS (10 * 1000) // milliseconds ( 10 s * 1000 ms/s)
 #define BOOT_STARTUP_INTERVAL_TXT "Wating 10 seconds before next measurement data series is started"
 
 //To create the JSON and read the P1 port
@@ -121,10 +121,10 @@ void app_main(void) {
     ESP_LOGI(TAG, "Starting timesync task");
     xTaskCreatePinnedToCore(&timesync_task, "timesync_task", 4096, NULL, 1, NULL, 1);
 
+    #ifdef CONFIG_TWOMES_PRESENCE_DETECTION
     ESP_LOGD(TAG, BOOT_STARTUP_INTERVAL_TXT);
     vTaskDelay(BOOT_STARTUP_INTERVAL_MS / portTICK_PERIOD_MS);
-
-    #ifdef CONFIG_TWOMES_PRESENCE_DETECTION
+    
     ESP_LOGD(TAG, "Starting presence detection");
     start_presence_detection();
     #endif

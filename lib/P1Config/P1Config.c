@@ -5,8 +5,9 @@
  */
 void initP1UART() {
     //UART Configuration for P1-Port reading:
-    #ifdef DSMR2or3
-    //9600 baud 7E1, even parity
+#ifdef DSMR2OR3
+#pragma message "building DSMR2/3"
+//9600 baud 7E1, even parity
     uart_config_t uart_config = {
         .baud_rate = 9600,
         .data_bits = UART_DATA_7_BITS,
@@ -15,8 +16,9 @@ void initP1UART() {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
     };
-    #else //DSMR4 and DSMR5
-    //115200 baud, 8n1, no parity, no HW flow control
+#else //DSMR4 and DSMR5
+#pragma message "building DSMR4/5"
+//115200 baud, 8n1, no parity, no HW flow control
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -25,7 +27,7 @@ void initP1UART() {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
     };
-    #endif
+#endif
     ESP_ERROR_CHECK(uart_param_config(P1PORT_UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(P1PORT_UART_NUM, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_set_line_inverse(P1PORT_UART_NUM, UART_SIGNAL_RXD_INV | UART_SIGNAL_IRDA_RX_INV)); //Invert RX data
@@ -393,7 +395,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     if (elecTimePos != NULL) {
         sscanf(elecTimePos, "0-0:1.0.0(%13s", p1Struct->timeElecMeasurement);
         p1Struct->timeElecMeasurement[13] = 0; //add a zero terminator at the end to read as string
-    } 
+    }
 #ifdef DSMR2OR3
     //DSMR 2.2 had different layout of gas timestap and gas reading
     //Gas reading OBIS: 0-n:24.3.0 //n can vary depending on which channel it is installed
@@ -411,7 +413,7 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     else
         return P1_ERROR_GAS_READING_NOT_FOUND;
 #else
-//Gas reading OBIS: 0-n:24.2.1 //n can vary depending on which channel it is installed
+    //Gas reading OBIS: 0-n:24.2.1 //n can vary depending on which channel it is installed
     char *gasPos = strstr(p1String, "0-1:24.2.1");
     if (gasPos != NULL) {
         sscanf(gasPos, "0-1:24.2.1(%13s)(%lf)", p1Struct->timeGasMeasurement, &p1Struct->gasUsage);

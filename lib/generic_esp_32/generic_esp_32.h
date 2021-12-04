@@ -29,7 +29,7 @@
 #include "presence_detection.h"
 #endif
 
-#define VERSION "V2.6.0"
+#define VERSION "V2.7.0"
 #define BOOT   GPIO_NUM_0
 #define RED_LED_ERROR   GPIO_NUM_19
 #define LONG_BUTTON_PRESS_DURATION 19 // (10 s * 2 halfseconds - 1); this constant specifies the number of half seconds minus one to wait
@@ -67,7 +67,7 @@
 #define MAX_WAIT_802_11_TXT "30 seconds"
 #endif
 
-xSemaphoreHandle wireless_802_11_mutex;
+extern xSemaphoreHandle wireless_802_11_mutex;
 
 #ifdef CONFIG_TWOMES_TEST_SERVER
 #define TWOMES_SERVER_HOSTNAME "api.tst.energietransitiewindesheim.nl"
@@ -125,10 +125,11 @@ void timesync(bool already_connected);
 void initialize_timezone(char *timezone);
 #define POST_WITH_BEARER true
 #define POST_WITHOUT_BEARER false
-int upload_data_to_server(const char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
-int post_https(const char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
+int upload_data_to_server(char *endpoint, bool use_bearer, char *data, char *response_buf, uint8_t resp_buf_size);
+int post_https(char *endpoint, bool use_bearer, bool already_connected, char *data, char *response_buf, uint8_t resp_buf_size);
 void upload_heartbeat(int hbcounter);
 void heartbeat_task(void *data);
+void delete_bearer();
 char *get_bearer();
 void activate_device();
 void get_http(const char *url);

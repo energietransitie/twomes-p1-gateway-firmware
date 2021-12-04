@@ -278,18 +278,22 @@ void buttonPressHandler(void *args) {
                     ESP_LOGD(TAG, "Button SW3 has been pressed for %u half-seconds now", halfSeconds);
                     if (halfSeconds >= LONG_BUTTON_PRESS_DURATION) {
                         //Long press on SW3 is for clearing Wi-Fi provisioning memory:
-                        ESP_LOGI("ISR", "Long-button press detected on SW3; resetting Wi-Fi provisioning and restarting device");
+                        ESP_LOGI(TAG, "Long-button press detected on SW3; resetting Wi-Fi provisioning");
                         char blinkArgs[2] = { 5, RED_LED_D1_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink longpress", 768, (void *)blinkArgs, 10, NULL, 1);
                         esp_wifi_restore();
-                        vTaskDelay(5 * (200+200) * 1000 / portTICK_PERIOD_MS); //Wait 1s for blink to finish
+  						// also remove bearer to force re-activation
+						delete_bearer();                      
+                        ESP_LOGI(TAG, "Blinking; soon restarting device");
+                        vTaskDelay( 2 * 1000 / portTICK_PERIOD_MS); //Wait 2s for blink to finish
+                        ESP_LOGI(TAG, "Restarting device...");
                         esp_restart();                         //software restart, to enable linking to new Wi-Fi router. Sensors do NOT need to be paired again: MAC address of P1-gateway does not change)
                         break;                                 //Exit loop (this should not be reached)
                     }                                          //if (halfSeconds == 9)
                     else if (gpio_get_level(BUTTON_GPIO12_SW3)) {
                         //Button SW3 is released
                         //Short press on SW3 is for coupling with a satellite by sending the ESP-NOW channel number on channel 0:
-                        ESP_LOGI("ISR", "Short button press detected on SW3");
+                        ESP_LOGI(TAG, "Short button press detected on SW3");
                         char blinkArgs[2] = { 5, GREEN_LED_D2_STATUS };
                         xTaskCreatePinnedToCore(blink, "blink_green_LED_5_times", 768, (void *)blinkArgs, 10, NULL, 1);
                         xTaskCreatePinnedToCore(sendEspNowChannel, "pair_sensor", 2048, NULL, 15, NULL, 1); //Send data in relatively high priority task

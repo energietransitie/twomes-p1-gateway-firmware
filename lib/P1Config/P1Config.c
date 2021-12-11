@@ -278,7 +278,11 @@ char *packageP1MessageJSON(P1Data *data) {
         "{\"property_name\": \"eMeterReadingTimestamp\","
         "\"measurements\": ["
         "{\"timestamp\": \"%u\","
+#ifdef DSMR2OR3
+        "\"value\": \"%12s\"}"  //12 character string
+#else
         "\"value\": \"%13s\"}"  //13 character string
+#endif
         "]},"
         "{\"property_name\": \"gMeterReadingSupply\","
         "\"measurements\": ["
@@ -288,7 +292,11 @@ char *packageP1MessageJSON(P1Data *data) {
         "{\"property_name\": \"gMeterReadingTimestamp\","
         "\"measurements\": ["
         "{\"timestamp\": \"%u\","
+#ifdef DSMR2OR3
+        "\"value\": \"%12s\"}"  //12 character string
+#else
         "\"value\": \"%13s\"}"  //13 character string
+#endif
         "]}"
         "]}";
     char *P1JSONbuffer = malloc(JSON_BUFFER_SIZE);
@@ -390,11 +398,20 @@ int p1StringToStruct(const char *p1String, P1Data *p1Struct) {
     else
         return P1_ERROR_ELECRETURNT2_NOT_FOUND;
 
+#ifdef DSMR2OR3
+    //elec Timestamp OBIS reference 
+    char *elecTimePos = strstr(p1String, "0-0:24.3.0");
+    if (elecTimePos != NULL) {
+        sscanf(elecTimePos, "0-0:24.3.0(%12s", p1Struct->timeElecMeasurement);
+        p1Struct->timeElecMeasurement[12] = 0; //add a zero terminator at the end to read as string
+
+#else
     //elec Timestamp OBIS reference 
     char *elecTimePos = strstr(p1String, "0-0:1.0.0");
     if (elecTimePos != NULL) {
         sscanf(elecTimePos, "0-0:1.0.0(%13s", p1Struct->timeElecMeasurement);
         p1Struct->timeElecMeasurement[13] = 0; //add a zero terminator at the end to read as string
+#endif
     }
 #ifdef DSMR2OR3
     //DSMR 2.2 had different layout of gas timestap and gas reading

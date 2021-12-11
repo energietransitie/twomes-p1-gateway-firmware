@@ -281,6 +281,7 @@ void buttonPressHandler(void *args) {
                         ESP_LOGI(TAG, "Long-button press detected on SW3; resetting Wi-Fi provisioning");
                         char blinkArgs[2] = { 5, RED_LED_D1_ERROR };
                         xTaskCreatePinnedToCore(blink, "blink_red_LED_5_times", 768, (void *)blinkArgs, 10, NULL, 1);
+                        esp_wifi_restore();
                         // also remove bearer to force re-activation
 						delete_bearer();
                         vTaskDelay(5 * (200 + 200) / portTICK_PERIOD_MS); //Wait 2s for red blink to finish

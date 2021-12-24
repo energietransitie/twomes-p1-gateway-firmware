@@ -14,7 +14,7 @@ Firmware for the Twomes P1 Gateway measurement device.
 ## General info
 This repository contains the firmware for the [Twomes P1 Gateway device](https://github.com/energietransitie/twomes-p1-gateway-hardware). It is written in C and is based on the [ESP-IDF](https://github.com/espressif/esp-idf) platform. It uses the [Generic Firmware for Twomes measurement devices](https://github.com/energietransitie/twomes-generic-esp-firmware) for matters such as device preperation, provisioning of home Wi-Fi network credentials, device-backend activation, network time synchronisation via NTP and secure uploading of measurement data. 
 
-This specific firmware reads data from the P1 port of smart meters adhering to the [DSMR standards]((https://www.netbeheernederland.nl/dossiers/slimme-meter-15/documenten). As part of its gateway function, it can be paired with one or more 'satellite' mesurement devices, receive measurements via the energy-efficient [ESP-NOW](https://www.espressif.com/en/products/software/esp-now/overview) protocol, thus lengthening the battery life of such satellite measurement devcies, and upload these messages via Wi-Fi and the internet to a Twomes server.
+This specific firmware reads data from the P1 port of smart meters adhering to the [DSMR standards](https://www.netbeheernederland.nl/dossiers/slimme-meter-15/documenten). As part of its gateway function, it can be paired with one or more 'satellite' measurement devices, receive measurements via the energy-efficient [ESP-NOW](https://www.espressif.com/en/products/software/esp-now/overview) protocol, thus lengthening the battery life of such satellite measurement devcies, and upload these messages via Wi-Fi and the internet to a Twomes server.
 
 For the associated hardware design files for the P1 Gateway hardware and enclosure and tips and instructions how to produce and assemble the hardware, please see the [twomes-p1-gateway-hardware](https://github.com/energietransitie/twomes-p1-gateway-hardware) repository. 
 
@@ -62,7 +62,7 @@ List of features ready and TODOs for future development (other than the [feature
 Ready:
 * Read data from the P1 port of devices adhering to DSMRv4 and DSMRv5 (UART settings 115200/8N1).
 * Read data from the P1 port of devices adhering to DSMRv2 and DSMRv3 (UART settings 9600/7E1).
-* Indicate status and error through LEDs.
+* Indicate status and error via LEDs.
 * Reset Wi-Fi provisioning by a long press (>10s) of the button `K` (this button is labeled `GPIO12 (SW3)` on the PCB). 
 * Confirm pairing with satellite measurement devices with the button `K` (this button is labeled `GPIO12 (SW3)` on the PCB).
 * Receive ESP-NOW data from satellite measurement devices and send this to a Twomes server: 
@@ -70,6 +70,7 @@ Ready:
 	* [Twomes Room Monitor Module](https://github.com/energietransitie/twomes-room-monitor-firmware)  
 
 To-do:
+* Align indication of status and error via LEDs with other measurement devices. 
 
 ## Status
 Project is: in Progress.

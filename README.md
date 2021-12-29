@@ -92,5 +92,5 @@ This software is a collaborative effort of:
 * Marco Winkelman · [@MarcoW71](https://github.com/MarcoW71)
 * Kevin Janssen · [@KevinJan18](https://github.com/KevinJan18)
 
-We use and gratefully aknowlegde the efforts of the makers of the following source code and libraries:
+We use and gratefully acknowlegde the efforts of the makers of the following source code and libraries:
 * [ESP-IDF](https://github.com/espressif/esp-idf), by Espressif Systems, licensed under [Apache 2.0 License](https://github.com/espressif/esp-idf/blob/master/LICENSE)

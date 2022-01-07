@@ -51,7 +51,7 @@ Pairing a satellite to the  [Twomes P1 Gateway measurement device](https://githu
 ## Developing 
 This section describes how you can change the source code using a development environment and compile the source code into a binary release of the firmware that can be depoyed, either via the development environment, or via the method described in the section [Deploying](#deploying).
 
-Please see the [developing section of the generig Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#developing) first. Remember to press buttons to upload the firmware: 
+Please see the [developing section of the generic Twomes firmware](https://github.com/energietransitie/twomes-generic-esp-firmware#developing) first. Remember to press buttons to upload the firmware: 
 * When you see the beginning of the sequence `Connecting ....___....`, press and hold the button labeled `GPIO0 (SW2)` on the PCB, then briefly press the button labeled `RESET (SW1)`, then release the button labeled `GPIO0 (SW2)`;
 * You should see an indication that the firmware is being written to the device.
 

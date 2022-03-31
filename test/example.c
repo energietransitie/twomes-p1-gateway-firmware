@@ -1,7 +1,7 @@
 #include <generic_esp_32.h>
 #define LOCAL_SERVER "http://192.168.178.48:8000/device/measurements/fixed-interval"
-#define OFFICIAL_SERVER "https://api.tst.energietransitiewindesheim.nl/device/measurements/fixed-interval"
-#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energietransitiewindesheim.nl/device/activate"
+#define OFFICIAL_SERVER "https://api.tst.energiebeveiliging.nl/device/measurements/fixed-interval"
+#define OFFICIAL_SERVER_DEVICE_ACTIVATION "https://api.tst.energiebeveiliging.nl/device/activate"
 static const char *TAG = "Twomes Heartbeat Test Application ESP32";
 
 
